@@ -3,6 +3,7 @@ package helper
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // FileInfo 包含文件的基本信息
@@ -65,6 +66,9 @@ func contains(slice []string, item string) bool {
 
 func isExcluded(path string, excludes []string) bool {
 	for _, pattern := range excludes {
+		if strings.Contains(path, pattern) {
+			return true
+		}
 		matched, err := filepath.Match(pattern, filepath.Base(path))
 		if err == nil && matched {
 			return true
