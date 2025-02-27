@@ -34,9 +34,19 @@ func WalkDir(root string, callback WalkFunc) error {
 // FilterFiles 使用 WalkDir 来过滤文件
 func FilterFiles(root string, extensions []string, excludes []string) ([]string, error) {
 	var files []string
+	includeAll := contains(extensions, "*")
 
 	err := WalkDir(root, func(fileInfo FileInfo) error {
 		if fileInfo.Info.IsDir() {
+			return nil
+		}
+
+		if isExcluded(fileInfo.Path, excludes) {
+			return nil
+		}
+
+		if includeAll {
+			files = append(files, fileInfo.Path)
 			return nil
 		}
 
@@ -45,7 +55,7 @@ func FilterFiles(root string, extensions []string, excludes []string) ([]string,
 			ext = ext[1:] // 移除开头的点
 		}
 
-		if contains(extensions, ext) && !isExcluded(fileInfo.Path, excludes) {
+		if contains(extensions, ext) {
 			files = append(files, fileInfo.Path)
 		}
 

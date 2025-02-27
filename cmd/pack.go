@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-git/go-git/v5"
 	"github.com/jung-kurt/gofpdf"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/spf13/cobra"
@@ -16,6 +17,7 @@ var (
 	exts     []string
 	output   string
 	excludes []string
+	gitURL   string
 )
 
 var packCmd = &cobra.Command{
@@ -28,13 +30,45 @@ var packCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(packCmd)
 
-	packCmd.Flags().StringSliceVarP(&exts, "exts", "e", []string{"py", "ts", "js", "html", "less"}, "File extensions to include")
+	packCmd.Flags().StringSliceVarP(&exts, "exts", "e", []string{"*"}, "File extensions to include")
 	packCmd.Flags().StringVarP(&output, "output", "o", "output.pdf", "Output file name")
 	packCmd.Flags().StringSliceVarP(&excludes, "excludes", "x", []string{}, "Glob patterns to exclude")
+	packCmd.Flags().StringVarP(&gitURL, "git-url", "g", "", "Git repository URL to clone and pack")
 }
 
 func runPack(cmd *cobra.Command, args []string) {
-	files, ferr := helper.FilterFiles(cmdPath, exts, excludes)
+	var targetPath string
+
+	if gitURL != "" {
+		// 创建临时目录
+		tempDir, err := os.MkdirTemp("", "git-clone-")
+		if err != nil {
+			fmt.Printf("Error creating temporary directory: %v\n", err)
+			return
+		}
+		defer os.RemoveAll(tempDir)
+
+		// 克隆仓库
+		_, err = git.PlainClone(tempDir, false, &git.CloneOptions{
+			URL: gitURL,
+		})
+		if err != nil {
+			fmt.Printf("Error cloning repository: %v\n", err)
+			return
+		}
+
+		targetPath = tempDir
+	} else {
+		targetPath = cmdPath
+	}
+
+	files, ferr := helper.FilterFiles(targetPath, exts, excludes)
+
+	if ferr != nil {
+		fmt.Printf("Error finding files: %v\n", ferr)
+		return
+	}
+
 	if ferr != nil {
 		fmt.Printf("Error finding files: %v\n", ferr)
 		return
