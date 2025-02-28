@@ -130,8 +130,7 @@ func FilterReadableFiles(root string, options WalkDirOptions) ([]string, error) 
 		}
 		return nil
 	}, filter, options)
-	log.Printf("FilterReadableFiles completed. Processed %d files in total (elapsed: %v)", count, time.Since(startTime))
-	log.Printf("处理的文件数量: %d\n", len(files))
+	log.Printf("FilterReadableFiles completed: processed %d files, filtered %d readable files. Elapsed time: %v", count, len(files), time.Since(startTime))
 	return files, err
 }
 

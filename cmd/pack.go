@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-git/go-git/v5"
 	"github.com/jung-kurt/gofpdf"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/spf13/cobra"
@@ -43,22 +42,11 @@ func runPack(cmd *cobra.Command, args []string) {
 
 	if gitURL != "" {
 		// 创建临时目录
-		tempDir, err := os.MkdirTemp("", "git-clone-")
-		if err != nil {
-			fmt.Printf("Error creating temporary directory: %v\n", err)
-			return
-		}
-		defer os.RemoveAll(tempDir)
-
-		// 克隆仓库
-		_, err = git.PlainClone(tempDir, false, &git.CloneOptions{
-			URL: gitURL,
-		})
+		tempDir, err := helper.CloneProject(gitURL)
 		if err != nil {
 			fmt.Printf("Error cloning repository: %v\n", err)
 			return
 		}
-
 		targetPath = tempDir
 	} else {
 		targetPath = cmdPath
