@@ -1,5 +1,6 @@
 # WN - 文件打包工具
 
+
 ## 概述
 WN是一个命令行工具，用于将指定类型的源代码文件打包成PDF、Markdown、XML或纯文本格式。
 
@@ -10,9 +11,18 @@ WN是一个命令行工具，用于将指定类型的源代码文件打包成PDF
 - 支持中英文语言切换
 
 ## 安装
+
+### 下载安装 
+```
+curl -sSL https://github.com/sjzsdu/wn/raw/master/get-wn.sh | bash
+```
+
+### 源码安装
 1. 确保已安装Go 1.20+
 2. 克隆仓库
 3. 运行`go build`编译项目
+
+
 
 ## 使用说明
 ```bash
