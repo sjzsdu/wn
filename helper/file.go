@@ -65,10 +65,13 @@ func WalkDir(root string, callback WalkFunc, filter FilterFunc, options WalkDirO
 			}
 		}
 
-		// 应用扩展名筛选
-		if len(options.Extensions) > 0 && !info.IsDir() {
-			ext := strings.TrimPrefix(filepath.Ext(path), ".")
-			if !StringSliceContains(options.Extensions, ext) {
+		// 检查文件扩展名
+		if len(options.Extensions) > 0 {
+			ext := strings.ToLower(filepath.Ext(fileInfo.Path))
+			if len(ext) > 0 {
+				ext = ext[1:] // 移除开头的点
+			}
+			if !StringSliceContains(options.Extensions, ext) && !StringSliceContains(options.Extensions, "*") {
 				return nil
 			}
 		}
@@ -96,9 +99,9 @@ func FilterReadableFiles(root string, options WalkDirOptions) ([]string, error) 
 		if count%1000 == 0 {
 			log.Printf("Processed %d files", count)
 		}
-		// 如果是目录，允许继续遍历
+		// 如果是目录，允许继续遍历，但排除 .git 目录
 		if fileInfo.Info.IsDir() {
-			return true
+			return fileInfo.Info.Name() != ".git"
 		}
 
 		// 检查文件是否为可读文本文件
@@ -128,6 +131,7 @@ func FilterReadableFiles(root string, options WalkDirOptions) ([]string, error) 
 		return nil
 	}, filter, options)
 	log.Printf("FilterReadableFiles completed. Processed %d files in total (elapsed: %v)", count, time.Since(startTime))
+	log.Printf("处理的文件数量: %d\n", len(files))
 	return files, err
 }
 

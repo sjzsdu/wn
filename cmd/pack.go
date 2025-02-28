@@ -32,7 +32,7 @@ func init() {
 	rootCmd.AddCommand(packCmd)
 
 	packCmd.Flags().StringSliceVarP(&extensions, "exts", "e", []string{"*"}, "File extensions to include")
-	packCmd.Flags().StringVarP(&output, "output", "o", "output.pdf", "Output file name")
+	packCmd.Flags().StringVarP(&output, "output", "o", "output.xml", "Output file name")
 	packCmd.Flags().StringSliceVarP(&excludes, "excludes", "x", []string{}, "Glob patterns to exclude")
 	packCmd.Flags().StringVarP(&gitURL, "git-url", "g", "", "Git repository URL to clone and pack")
 	packCmd.Flags().BoolVarP(&disableGitIgnore, "disable-gitignore", "d", false, "Disable .gitignore rules")
@@ -158,32 +158,51 @@ func packToXML(filePaths []string) ([]byte, error) {
 
 func packToPDF(files []string) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
-	pdf.SetFont("Arial", "", 12)
+
+	fontPath, err := helper.FindFont()
+	if err != nil {
+		return nil, fmt.Errorf("error finding suitable font: %v", err)
+	}
+
+	fontName := filepath.Base(fontPath)
+	fontName = fontName[:len(fontName)-len(filepath.Ext(fontName))] // Remove extension
+	fontName = strings.ReplaceAll(fontName, " ", "")                // Remove spaces from font name
+
+	// Read font file
+	fontData, err := os.ReadFile(fontPath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading font file: %v", err)
+	}
+
+	// Add font
+	pdf.AddUTF8FontFromBytes(fontName, "", fontData)
+
+	pdf.SetFont(fontName, "", 12)
 
 	for _, file := range files {
 		pdf.AddPage()
 
-		// 添加文件名作为标题
-		pdf.SetFont("Arial", "B", 16)
+		// Add filename as title
+		pdf.SetFont(fontName, "", 16) // Changed from "B" to ""
 		pdf.Cell(40, 10, filepath.Base(file))
 		pdf.Ln(10)
 
-		// 重置字体为正常大小
-		pdf.SetFont("Arial", "", 12)
+		// Reset font to normal size
+		pdf.SetFont(fontName, "", 12)
 
-		// 读取文件内容
+		// Read file content
 		content, err := os.ReadFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("error reading file %s: %v", file, err)
 		}
 
-		// 将文件内容添加到 PDF
+		// Add file content to PDF
 		pdf.MultiCell(0, 10, string(content), "", "", false)
 	}
 
-	// 保存 PDF 到内存缓冲区
+	// Save PDF to memory buffer
 	var buf bytes.Buffer
-	err := pdf.Output(&buf)
+	err = pdf.Output(&buf)
 	if err != nil {
 		return nil, fmt.Errorf("error generating PDF: %v", err)
 	}
