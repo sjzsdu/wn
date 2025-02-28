@@ -14,10 +14,11 @@ import (
 )
 
 var (
-	exts     []string
-	output   string
-	excludes []string
-	gitURL   string
+	extensions       []string
+	output           string
+	excludes         []string
+	gitURL           string
+	disableGitIgnore bool
 )
 
 var packCmd = &cobra.Command{
@@ -30,10 +31,11 @@ var packCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(packCmd)
 
-	packCmd.Flags().StringSliceVarP(&exts, "exts", "e", []string{"*"}, "File extensions to include")
+	packCmd.Flags().StringSliceVarP(&extensions, "exts", "e", []string{"*"}, "File extensions to include")
 	packCmd.Flags().StringVarP(&output, "output", "o", "output.pdf", "Output file name")
 	packCmd.Flags().StringSliceVarP(&excludes, "excludes", "x", []string{}, "Glob patterns to exclude")
 	packCmd.Flags().StringVarP(&gitURL, "git-url", "g", "", "Git repository URL to clone and pack")
+	packCmd.Flags().BoolVarP(&disableGitIgnore, "disable-gitignore", "d", false, "Disable .gitignore rules")
 }
 
 func runPack(cmd *cobra.Command, args []string) {
@@ -62,7 +64,12 @@ func runPack(cmd *cobra.Command, args []string) {
 		targetPath = cmdPath
 	}
 
-	files, ferr := helper.FilterFiles(targetPath, exts, excludes)
+	options := helper.WalkDirOptions{
+		DisableGitIgnore: disableGitIgnore,
+		Extensions:       extensions,
+		Excludes:         excludes,
+	}
+	files, ferr := helper.FilterReadableFiles(targetPath, options)
 
 	if ferr != nil {
 		fmt.Printf("Error finding files: %v\n", ferr)
