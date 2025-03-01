@@ -23,7 +23,7 @@ var (
 var packCmd = &cobra.Command{
 	Use:   "pack",
 	Short: L("Pack files"),
-	Long:  "Pack files with specified extensions into a single output file",
+	Long:  L("Pack files with specified extensions into a single output file"),
 	Run:   runPack,
 }
 
