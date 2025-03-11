@@ -139,7 +139,7 @@ var textExtensions = map[string]bool{
 	".yml": true, ".yaml": true, ".go": true, ".py": true, ".js": true, ".ts": true,
 	".html": true, ".css": true, ".java": true, ".c": true, ".cpp": true, ".h": true,
 	".rb": true, ".php": true, ".sh": true, ".bat": true, ".ps1": true, ".sql": true,
-	".r": true, ".scala": true, ".swift": true,
+	".r": true, ".scala": true, ".swift": true, ".mdx": true,
 }
 
 func isReadableTextFile(path string) bool {
