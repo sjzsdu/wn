@@ -1,9 +1,11 @@
-package cmd
+package config_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/sjzsdu/wn/config"
 )
 
 func TestGetConfig(t *testing.T) {
@@ -51,7 +53,7 @@ func TestGetConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetConfig(tt.key); got != tt.expected {
+			if got := config.GetConfig(tt.key); got != tt.expected {
 				t.Errorf("GetConfig() = %v, want %v", got, tt.expected)
 			}
 		})
@@ -65,11 +67,14 @@ func TestConfigOperations(t *testing.T) {
 	os.Setenv("HOME", tmpDir)
 	defer os.Setenv("HOME", origHome)
 
+	// 每次测试前清除所有配置
+	config.ClearAllConfig()
+
 	tests := []struct {
 		name     string
 		configs  map[string]string
 		wantErr  bool
-		validate func(t *testing.T, configs map[string]string)
+		validate func(t *testing.T)
 	}{
 		{
 			name: "基本配置保存和加载",
@@ -78,15 +83,16 @@ func TestConfigOperations(t *testing.T) {
 				"WN_DEEPSEEK_APIKEY": "test-key",
 			},
 			wantErr: false,
-			validate: func(t *testing.T, configs map[string]string) {
-				if len(configs) != 2 {
-					t.Errorf("期望配置数量为 2，实际为 %d", len(configs))
+			validate: func(t *testing.T) {
+				// 重新加载配置
+				if err := config.LoadConfig(); err != nil {
+					t.Fatalf("加载配置失败: %v", err)
 				}
-				// 使用 GetConfig 验证
-				if v := GetConfig("lang"); v != "zh" {
+
+				if v := config.GetConfig("lang"); v != "zh" {
 					t.Errorf("lang 期望为 zh，实际为 %s", v)
 				}
-				if v := GetConfig("deepseek_apikey"); v != "test-key" {
+				if v := config.GetConfig("deepseek_apikey"); v != "test-key" {
 					t.Errorf("deepseek_apikey 期望为 test-key，实际为 %s", v)
 				}
 			},
@@ -95,9 +101,9 @@ func TestConfigOperations(t *testing.T) {
 			name:    "空配置",
 			configs: map[string]string{},
 			wantErr: false,
-			validate: func(t *testing.T, configs map[string]string) {
-				if len(configs) != 0 {
-					t.Errorf("期望配置为空，实际数量为 %d", len(configs))
+			validate: func(t *testing.T) {
+				if v := config.GetConfig("lang"); v != "" {
+					t.Errorf("期望配置为空，实际为 %s", v)
 				}
 			},
 		},
@@ -105,29 +111,29 @@ func TestConfigOperations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 重置 configMap
-			configMap = make(map[string]string)
-
-			// 复制测试配置到 configMap
+			// 清除所有配置
+			config.ClearAllConfig()
+			
+			// 设置测试配置
 			for k, v := range tt.configs {
-				configMap[k] = v
+				config.SetConfig(k, v)
 			}
 
 			// 测试保存
-			if err := saveConfig(); (err != nil) != tt.wantErr {
-				t.Errorf("saveConfig() error = %v, wantErr %v", err, tt.wantErr)
+			if err := config.SaveConfig(); (err != nil) != tt.wantErr {
+				t.Errorf("SaveConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			// 清空 configMap
-			configMap = make(map[string]string)
+			// 清除所有配置
+			config.ClearAllConfig()
 
 			// 测试加载
-			if err := loadConfig(); (err != nil) != tt.wantErr {
-				t.Errorf("loadConfig() error = %v, wantErr %v", err, tt.wantErr)
+			if err := config.LoadConfig(); (err != nil) != tt.wantErr {
+				t.Errorf("LoadConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			// 验证结果
-			tt.validate(t, configMap)
+			tt.validate(t)
 
 			// 验证文件内容
 			if !tt.wantErr {
