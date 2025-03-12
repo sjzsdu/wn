@@ -22,8 +22,8 @@ var RootCmd = rootCmd
 
 var rootCmd = &cobra.Command{
 	Use:   share.BUILDNAME,
-	Short: "Wn command line tool",
-	Long:  `Wn command line tool`,
+	Short: lang.T("Wn command line tool"),
+	Long:  lang.T("Wn command line tool"),
 	Args:  cobra.MinimumNArgs(1),
 	CompletionOptions: cobra.CompletionOptions{
 		DisableDefaultCmd: true,
@@ -43,7 +43,7 @@ func Execute() {
 
 func init() {
 	lang.Init()
-	
+
 	rootCmd.PersistentFlags().StringVarP(&cmdPath, "workPath", "p", "", lang.T("work directory"))
 	rootCmd.PersistentFlags().StringSliceVarP(&extensions, "exts", "e", []string{"*"}, lang.T("File extensions to include"))
 	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "output.md", lang.T("Output file name"))

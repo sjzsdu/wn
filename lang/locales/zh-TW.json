@@ -9,5 +9,11 @@
     "Git repository URL to clone and pack": "要克隆和打包的Git倉庫URL",
     "Disable .gitignore rules": "禁用.gitignore規則",
     "Print version information": "列印版本資訊",
-    "Print detailed version information of wn": "列印 wn 的詳細版本資訊"
+    "Print detailed version information of wn": "列印 wn 的詳細版本資訊",
+    "Set config": "設置配置",
+    "Set global configuration": "設置全局配置",
+    "Set language": "設置語言",
+    "Set DeepSeek API Key": "設置 DeepSeek API 密鑰",
+    "List all configurations": "列出所有配置",
+    "Current configurations": "當前配置"
 }
