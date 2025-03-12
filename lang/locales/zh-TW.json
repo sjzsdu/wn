@@ -1,0 +1,13 @@
+{
+    "One or more arguments are not correct": "參數錯誤",
+    "work directory": "工作目錄",
+    "Pack files": "打包文件",
+    "Pack files with specified extensions into a single output file": "將指定擴展名的文件打包成單個輸出文件",
+    "File extensions to include": "要包含的文件擴展名",
+    "Output file name": "輸出文件名",
+    "Glob patterns to exclude": "要排除的文件模式",
+    "Git repository URL to clone and pack": "要克隆和打包的Git倉庫URL",
+    "Disable .gitignore rules": "禁用.gitignore規則",
+    "Print version information": "列印版本資訊",
+    "Print detailed version information of wn": "列印 wn 的詳細版本資訊"
+}

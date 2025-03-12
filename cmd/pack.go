@@ -9,13 +9,14 @@ import (
 
 	"github.com/jung-kurt/gofpdf"
 	"github.com/sjzsdu/wn/helper"
+	"github.com/sjzsdu/wn/lang"
 	"github.com/spf13/cobra"
 )
 
 var packCmd = &cobra.Command{
 	Use:   "pack",
-	Short: L("Pack files"),
-	Long:  L("Pack files with specified extensions into a single output file"),
+	Short: lang.T("Pack files"),
+	Long:  lang.T("Pack files with specified extensions into a single output file"),
 	Run:   runPack,
 }
 

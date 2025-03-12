@@ -3,21 +3,19 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/sjzsdu/wn/share"
+	"github.com/sjzsdu/wn/lang"
 	"github.com/spf13/cobra"
 )
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: L("Wn version"),
-	Long:  "Show Wn tool version",
-	Run:   runVersion,
+	Short: lang.T("Print version information"),
+	Long:  lang.T("Print detailed version information of wn"),
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("wn version 1.0.0")
+	},
 }
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
-}
-
-func runVersion(cmd *cobra.Command, args []string) {
-	fmt.Printf("Wn version:  %s\n", share.VERSION)
 }

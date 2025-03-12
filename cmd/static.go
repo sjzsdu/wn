@@ -8,23 +8,22 @@ import (
 	"strings"
 
 	"github.com/sjzsdu/wn/helper"
+	"github.com/sjzsdu/wn/lang"
 	"github.com/spf13/cobra"
 )
 
 var staticCmd = &cobra.Command{
 	Use:   "static",
-	Short: L("Static files"),
-	Long:  L("Static files with specified extensions into a single output file"),
+	Short: lang.T("Static files"),
+	Long:  lang.T("Static files with specified extensions into a single output file"),
 	Run:   runStatics,
 }
 
-// 添加一个新变量来控制是否打印到控制台
 var printToConsole bool
 
 func init() {
 	rootCmd.AddCommand(staticCmd)
-	// 添加新的标志，默认为false（不打印）
-	staticCmd.Flags().BoolVar(&printToConsole, "print", false, L("Print results to console"))
+	staticCmd.Flags().BoolVar(&printToConsole, "print", false, lang.T("Print results to console"))
 }
 
 func runStatics(cmd *cobra.Command, args []string) {

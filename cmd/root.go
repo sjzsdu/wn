@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/share"
 	"github.com/spf13/cobra"
 )
@@ -17,26 +18,6 @@ var (
 	disableGitIgnore bool
 )
 
-var lang = os.Getenv("WN_LANG")
-var langs = map[string]string{
-	"One or more arguments are not correct": "参数错误",
-	"work directory":                        "工作目录",
-	"Pack files":                            "打包文件",
-	"Pack files with specified extensions into a single output file": "将指定扩展名的文件打包成单个输出文件",
-}
-
-// L Language switch
-func L(words string) string {
-	if lang == "" {
-		return words
-	}
-
-	if trans, has := langs[words]; has {
-		return trans
-	}
-	return words
-}
-
 var RootCmd = rootCmd
 
 var rootCmd = &cobra.Command{
@@ -48,7 +29,7 @@ var rootCmd = &cobra.Command{
 		DisableDefaultCmd: true,
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintln(os.Stderr, L("One or more arguments are not correct"), args)
+		fmt.Fprintln(os.Stderr, lang.T("One or more arguments are not correct"), args)
 		os.Exit(1)
 	},
 }
@@ -61,10 +42,12 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&cmdPath, "workPath", "p", "", L("work directory"))
-	rootCmd.PersistentFlags().StringSliceVarP(&extensions, "exts", "e", []string{"*"}, "File extensions to include")
-	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "output.md", "Output file name")
-	rootCmd.PersistentFlags().StringSliceVarP(&excludes, "excludes", "x", []string{}, "Glob patterns to exclude")
-	rootCmd.PersistentFlags().StringVarP(&gitURL, "git-url", "g", "", "Git repository URL to clone and pack")
-	rootCmd.PersistentFlags().BoolVarP(&disableGitIgnore, "disable-gitignore", "d", false, "Disable .gitignore rules")
+	lang.Init()
+	
+	rootCmd.PersistentFlags().StringVarP(&cmdPath, "workPath", "p", "", lang.T("work directory"))
+	rootCmd.PersistentFlags().StringSliceVarP(&extensions, "exts", "e", []string{"*"}, lang.T("File extensions to include"))
+	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "output.md", lang.T("Output file name"))
+	rootCmd.PersistentFlags().StringSliceVarP(&excludes, "excludes", "x", []string{}, lang.T("Glob patterns to exclude"))
+	rootCmd.PersistentFlags().StringVarP(&gitURL, "git-url", "g", "", lang.T("Git repository URL to clone and pack"))
+	rootCmd.PersistentFlags().BoolVarP(&disableGitIgnore, "disable-gitignore", "d", false, lang.T("Disable .gitignore rules"))
 }
