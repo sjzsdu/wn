@@ -12,14 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	extensions       []string
-	output           string
-	excludes         []string
-	gitURL           string
-	disableGitIgnore bool
-)
-
 var packCmd = &cobra.Command{
 	Use:   "pack",
 	Short: L("Pack files"),
@@ -29,12 +21,6 @@ var packCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(packCmd)
-
-	packCmd.Flags().StringSliceVarP(&extensions, "exts", "e", []string{"*"}, "File extensions to include")
-	packCmd.Flags().StringVarP(&output, "output", "o", "output.xml", "Output file name")
-	packCmd.Flags().StringSliceVarP(&excludes, "excludes", "x", []string{}, "Glob patterns to exclude")
-	packCmd.Flags().StringVarP(&gitURL, "git-url", "g", "", "Git repository URL to clone and pack")
-	packCmd.Flags().BoolVarP(&disableGitIgnore, "disable-gitignore", "d", false, "Disable .gitignore rules")
 }
 
 func runPack(cmd *cobra.Command, args []string) {
@@ -58,11 +44,6 @@ func runPack(cmd *cobra.Command, args []string) {
 		Excludes:         excludes,
 	}
 	files, ferr := helper.FilterReadableFiles(targetPath, options)
-
-	if ferr != nil {
-		fmt.Printf("Error finding files: %v\n", ferr)
-		return
-	}
 
 	if ferr != nil {
 		fmt.Printf("Error finding files: %v\n", ferr)

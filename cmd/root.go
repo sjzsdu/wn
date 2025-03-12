@@ -8,7 +8,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cmdPath string
+var (
+	cmdPath          string
+	extensions       []string
+	output           string
+	excludes         []string
+	gitURL           string
+	disableGitIgnore bool
+)
 
 var lang = os.Getenv("WN_LANG")
 var langs = map[string]string{
@@ -55,4 +62,9 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cmdPath, "workPath", "p", "", L("work directory"))
+	rootCmd.PersistentFlags().StringSliceVarP(&extensions, "exts", "e", []string{"*"}, "File extensions to include")
+	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "output.md", "Output file name")
+	rootCmd.PersistentFlags().StringSliceVarP(&excludes, "excludes", "x", []string{}, "Glob patterns to exclude")
+	rootCmd.PersistentFlags().StringVarP(&gitURL, "git-url", "g", "", "Git repository URL to clone and pack")
+	rootCmd.PersistentFlags().BoolVarP(&disableGitIgnore, "disable-gitignore", "d", false, "Disable .gitignore rules")
 }
