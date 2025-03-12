@@ -45,19 +45,26 @@ func Init() {
 	}
 }
 
-// T translates a message
-func T(msgID string) string {
-	// 如果未初始化 localizer，直接返回原始键
-	if loc == nil {
-		return msgID
-	}
+// T translates a message, optionally with template data
+func T(msgID string, data ...map[string]interface{}) string {
+    // 如果未初始化 localizer，直接返回原始键
+    if loc == nil {
+        return msgID
+    }
 
-	msg, err := loc.Localize(&i18n.LocalizeConfig{
-		MessageID: msgID,
-	})
-	if err != nil {
-		// 如果翻译出错（比如键不存在），返回原始键
-		return msgID
-	}
-	return msg
+    config := &i18n.LocalizeConfig{
+        MessageID: msgID,
+    }
+
+    // 如果提供了模板数据，则添加到配置中
+    if len(data) > 0 {
+        config.TemplateData = data[0]
+    }
+
+    msg, err := loc.Localize(config)
+    if err != nil {
+        // 如果翻译出错（比如键不存在），返回原始键
+        return msgID
+    }
+    return msg
 }

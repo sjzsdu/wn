@@ -46,7 +46,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVarP(&cmdPath, "workPath", "p", "", lang.T("work directory"))
 	rootCmd.PersistentFlags().StringSliceVarP(&extensions, "exts", "e", []string{"*"}, lang.T("File extensions to include"))
-	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "output.md", lang.T("Output file name"))
+	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "", lang.T("Output file name"))
 	rootCmd.PersistentFlags().StringSliceVarP(&excludes, "excludes", "x", []string{}, lang.T("Glob patterns to exclude"))
 	rootCmd.PersistentFlags().StringVarP(&gitURL, "git-url", "g", "", lang.T("Git repository URL to clone and pack"))
 	rootCmd.PersistentFlags().BoolVarP(&disableGitIgnore, "disable-gitignore", "d", false, lang.T("Disable .gitignore rules"))

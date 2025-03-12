@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/sjzsdu/wn/lang"
+	"github.com/sjzsdu/wn/share"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +13,9 @@ var versionCmd = &cobra.Command{
 	Short: lang.T("Print version information"),
 	Long:  lang.T("Print detailed version information of wn"),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("wn version 1.0.0")
+		fmt.Println(lang.T("wn version {{.Version}}", map[string]interface{}{
+			"Version": share.VERSION,
+		}))
 	},
 }
 

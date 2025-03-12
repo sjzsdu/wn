@@ -27,6 +27,11 @@ func init() {
 func runPack(cmd *cobra.Command, args []string) {
 	var targetPath string
 
+	if output == "" {
+		fmt.Printf("Output is required")
+		return
+	}
+
 	if gitURL != "" {
 		// 创建临时目录
 		tempDir, err := helper.CloneProject(gitURL)
