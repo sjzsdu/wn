@@ -23,7 +23,6 @@ func TestI18n(t *testing.T) {
 	resetEnv()
 
 	// 测试默认语言（英文）
-	Init()
 	if msg := T("test message"); msg != "test message" {
 		t.Errorf("Expected original message, got %s", msg)
 	}
@@ -31,7 +30,6 @@ func TestI18n(t *testing.T) {
 	// 测试简体中文
 	resetEnv()
 	os.Setenv("WN_LANG", "zh-CN")
-	Init()
 	if msg := T("Pack files"); msg != "打包文件" {
 		t.Errorf("Expected '打包文件', got %s", msg)
 	}
@@ -39,7 +37,6 @@ func TestI18n(t *testing.T) {
 	// 测试繁体中文
 	resetEnv()
 	os.Setenv("WN_LANG", "zh-TW")
-	Init()
 	if msg := T("Pack files"); msg != "打包文件" {
 		t.Errorf("Expected '打包文件', got %s", msg)
 	}
@@ -47,7 +44,6 @@ func TestI18n(t *testing.T) {
 	// 测试不存在的语言
 	resetEnv()
 	os.Setenv("WN_LANG", "fr")
-	Init()
 	if msg := T("Pack files"); msg != "Pack files" {
 		t.Errorf("Expected original message, got %s", msg)
 	}
@@ -55,7 +51,6 @@ func TestI18n(t *testing.T) {
 	// 测试不存在的翻译键
 	resetEnv()
 	os.Setenv("WN_LANG", "zh-CN")
-	Init()
 	if msg := T("non-existent key"); msg != "non-existent key" {
 		t.Errorf("Expected original message, got %s", msg)
 	}
@@ -74,7 +69,6 @@ func TestI18n(t *testing.T) {
 	for _, test := range tests {
 		resetEnv()
 		os.Setenv("WN_LANG", test.lang)
-		Init()
 		if msg := T(test.message); msg != test.expected {
 			t.Errorf("Lang %s: Expected %s, got %s", test.lang, test.expected, msg)
 		}

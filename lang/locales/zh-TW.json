@@ -16,5 +16,18 @@
     "Set DeepSeek API Key": "設置 DeepSeek API 密鑰",
     "Set default LLM provider": "設置默認大模型提供商",
     "List all configurations": "列出所有配置",
-    "Current configurations": "當前配置"
+    "Current configurations": "當前配置",
+    
+    "Chat with AI": "與 AI 對話",
+    "Start an interactive chat session with AI using configured LLM provider": "使用配置的大模型提供商開始互動式 AI 對話",
+    "LLM model Provider": "大模型提供商",
+    "LLM model to use": "使用的大模型",
+    "Maximum tokens for response": "回應的最大 token 數",
+    "List available LLM providers": "列出可用的大模型提供商",
+    "List available models for current provider": "列出當前提供商支持的模型",
+    "Error getting LLM provider": "獲取大模型提供商失敗",
+    "Available LLM providers": "可用的大模型提供商",
+    "Available models for provider": "當前提供商支持的模型",
+    "Start chatting with AI": "開始與 AI 對話",
+    "Using model": "正在使用模型"
 }

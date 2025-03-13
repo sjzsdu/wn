@@ -17,8 +17,8 @@ var configCmd = &cobra.Command{
 }
 
 var (
-	flagKeys  = []string{"lang", "deepseek_apikey", "llm"}
-	listFlag  bool
+	flagKeys = []string{"lang", "deepseek_apikey", "llm"}
+	listFlag bool
 )
 
 func init() {
@@ -28,8 +28,9 @@ func init() {
 
 	rootCmd.AddCommand(configCmd)
 	configCmd.Flags().String("lang", config.GetConfig("lang"), lang.T("Set language"))
+	configCmd.Flags().String("default_provider", config.GetConfig("llm"), lang.T("Set default LLM provider"))
 	configCmd.Flags().String("deepseek_apikey", config.GetConfig("deepseek_apikey"), lang.T("Set DeepSeek API Key"))
-	configCmd.Flags().String("llm", config.GetConfig("llm"), lang.T("Set default LLM provider"))
+	configCmd.Flags().String("openai_apikey", config.GetConfig("openai_apikey"), lang.T("Set Openai API Key"))
 	configCmd.Flags().BoolVar(&listFlag, "list", false, lang.T("List all configurations"))
 }
 

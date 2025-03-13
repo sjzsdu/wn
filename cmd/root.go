@@ -42,8 +42,6 @@ func Execute() {
 }
 
 func init() {
-	lang.Init()
-
 	rootCmd.PersistentFlags().StringVarP(&cmdPath, "workPath", "p", "", lang.T("work directory"))
 	rootCmd.PersistentFlags().StringSliceVarP(&extensions, "exts", "e", []string{"*"}, lang.T("File extensions to include"))
 	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "", lang.T("Output file name"))

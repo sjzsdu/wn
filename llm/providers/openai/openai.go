@@ -27,36 +27,28 @@ type Provider struct {
 var _ llm.Provider = (*Provider)(nil)
 
 // New 创建一个新的OpenAI提供商
-func New(apiKey string, options ...Option) *Provider {
+func New(options map[string]interface{}) (llm.Provider, error) {
 	p := &Provider{
-		apiKey:      apiKey,
 		apiEndpoint: defaultAPIEndpoint,
 		client:      &http.Client{},
 		models:      []string{"gpt-3.5-turbo", "gpt-4"},
 	}
 
-	for _, option := range options {
-		option(p)
+	// 从 options 中获取配置
+	apiKey, ok := options["WN_OPENAI_APIKEY"].(string)
+	if !ok || apiKey == "" {
+		return nil, fmt.Errorf("openai: WN_OPENAI_APIKEY is required")
 	}
+	p.apiKey = apiKey
 
-	return p
-}
-
-// Option 定义Provider的配置选项
-type Option func(*Provider)
-
-// WithEndpoint 设置自定义API端点
-func WithEndpoint(endpoint string) Option {
-	return func(p *Provider) {
+	if endpoint, ok := options["WN_OPENAI_ENDPOINT"].(string); ok && endpoint != "" {
 		p.apiEndpoint = endpoint
 	}
-}
-
-// WithModels 设置可用模型列表
-func WithModels(models []string) Option {
-	return func(p *Provider) {
+	if models, ok := options["WN_OPENAI_MODELS"].([]string); ok && len(models) > 0 {
 		p.models = models
 	}
+
+	return p, nil
 }
 
 // Name 返回提供商名称
@@ -145,5 +137,5 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 
 func init() {
 	// 注册OpenAI提供商
-	llm.Register("openai", &Provider{})
+	llm.Register("openai", New)
 }

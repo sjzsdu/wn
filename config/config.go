@@ -22,13 +22,9 @@ func init() {
 func GetConfig(key string) string {
 	envKey := key
 	if !strings.HasPrefix(key, "WN_") {
-		envKey = getEnvKey(key)
+		envKey = GetEnvKey(key)
 	}
 	return os.Getenv(envKey)
-}
-
-func GetEnvKey(flagKey string) string {
-	return "WN_" + strings.ToUpper(flagKey)
 }
 
 func LoadConfig() error {
@@ -89,7 +85,7 @@ func SaveConfig() error {
 	return file.Sync() // 确保数据写入磁盘
 }
 
-func getEnvKey(flagKey string) string {
+func GetEnvKey(flagKey string) string {
 	return "WN_" + strings.ToUpper(flagKey)
 }
 
@@ -97,7 +93,7 @@ func getEnvKey(flagKey string) string {
 func SetConfig(key, value string) {
 	envKey := key
 	if !strings.HasPrefix(key, "WN_") {
-		envKey = getEnvKey(key)
+		envKey = GetEnvKey(key)
 	}
 	configMap[envKey] = value
 	os.Setenv(envKey, value)
@@ -107,7 +103,7 @@ func SetConfig(key, value string) {
 func ClearConfig(key string) {
 	envKey := key
 	if !strings.HasPrefix(key, "WN_") {
-		envKey = getEnvKey(key)
+		envKey = GetEnvKey(key)
 	}
 	delete(configMap, envKey)
 	os.Unsetenv(envKey)
@@ -119,4 +115,9 @@ func ClearAllConfig() {
 		os.Unsetenv(key)
 	}
 	configMap = make(map[string]string)
+}
+
+// ClearAllConfig 清除所有配置
+func GetConfigMap() map[string]string {
+	return configMap
 }
