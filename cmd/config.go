@@ -17,7 +17,7 @@ var configCmd = &cobra.Command{
 }
 
 var (
-	flagKeys  = []string{"lang", "deepseek_apikey"}
+	flagKeys  = []string{"lang", "deepseek_apikey", "llm"}
 	listFlag  bool
 )
 
@@ -29,6 +29,7 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	configCmd.Flags().String("lang", config.GetConfig("lang"), lang.T("Set language"))
 	configCmd.Flags().String("deepseek_apikey", config.GetConfig("deepseek_apikey"), lang.T("Set DeepSeek API Key"))
+	configCmd.Flags().String("llm", config.GetConfig("llm"), lang.T("Set default LLM provider"))
 	configCmd.Flags().BoolVar(&listFlag, "list", false, lang.T("List all configurations"))
 }
 

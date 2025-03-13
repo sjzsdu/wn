@@ -14,6 +14,7 @@
     "Set global configuration": "设置全局配置",
     "Set language": "设置语言",
     "Set DeepSeek API Key": "设置 DeepSeek API 密钥",
+    "Set default LLM provider": "设置默认大模型提供商",
     "List all configurations": "列出所有配置",
     "Current configurations": "当前配置"
 }
