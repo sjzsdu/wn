@@ -10,8 +10,9 @@ import (
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/spf13/cobra"
-	_ "github.com/sjzsdu/wn/llm/providers/openai"
+
 	_ "github.com/sjzsdu/wn/llm/providers/deepseek"
+	_ "github.com/sjzsdu/wn/llm/providers/openai"
 )
 
 var (
@@ -36,6 +37,8 @@ func init() {
 	aiCmd.Flags().BoolVar(&listProviders, "providers", false, lang.T("List available LLM providers"))
 	aiCmd.Flags().BoolVar(&listModels, "models", false, lang.T("List available models for current provider"))
 	rootCmd.AddCommand(aiCmd)
+
+	llm.Init()
 }
 
 func runAI(cmd *cobra.Command, args []string) {

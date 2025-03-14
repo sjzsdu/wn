@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/sjzsdu/wn/config"
 	"github.com/sjzsdu/wn/lang"
@@ -23,7 +22,7 @@ var (
 
 func init() {
 	if config.GetConfig("lang") == "" {
-		os.Setenv("WN_LANG", "en")
+		config.SetConfig("lang", "en")
 	}
 
 	rootCmd.AddCommand(configCmd)
@@ -52,11 +51,26 @@ func runConfig(cmd *cobra.Command, args []string) {
 	}
 
 	configChanged := false
+	// 处理 flagKeys 中的标准配置项
 	for _, key := range flagKeys {
-		if cmd.Flag(key).Changed {
+		flag := cmd.Flag(key)
+		if flag != nil && flag.Changed {
 			value, _ := cmd.Flags().GetString(key)
-			os.Setenv(config.GetEnvKey(key), value)
+			config.SetConfig(key, value)
 			configChanged = true
+		}
+	}
+
+	// 特殊处理 default_provider 标志，将其映射到 llm 配置项
+	defaultProviderFlag := cmd.Flag("default_provider")
+	if defaultProviderFlag != nil && defaultProviderFlag.Changed {
+		value, err := cmd.Flags().GetString("default_provider")
+		if err == nil {
+			envKey := config.GetEnvKey("default_provider")
+			if envKey != "" {
+				config.SetConfig(envKey, value)
+				configChanged = true
+			}
 		}
 	}
 
@@ -64,14 +78,6 @@ func runConfig(cmd *cobra.Command, args []string) {
 		if err := config.SaveConfig(); err != nil {
 			fmt.Println("Error saving config:", err)
 			return
-		}
-	}
-
-	// 始终输出可导出的配置格式
-	for _, key := range flagKeys {
-		value := config.GetConfig(key)
-		if value != "" {
-			fmt.Printf("export %s=%s\n", config.GetEnvKey(key), value)
 		}
 	}
 }
