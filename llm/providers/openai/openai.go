@@ -32,8 +32,8 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 	p := &Provider{
 		apiEndpoint: defaultAPIEndpoint,
 		client:      &http.Client{},
-		models:      []string{"gpt-3.5-turbo", "gpt-4"},
-		model:       "gpt-4",
+		models:      []string{"gpt-3", "gpt-3.5-turbo", "gpt-4"},
+		model:       "gpt-3",
 	}
 
 	// 从 options 中获取配置

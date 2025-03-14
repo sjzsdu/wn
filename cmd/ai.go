@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
 	"strings"
+	"time"
 
+	"github.com/chzyer/readline"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/spf13/cobra"
@@ -70,16 +70,24 @@ func runAI(cmd *cobra.Command, args []string) {
 	targetModel := provider.SetModel(model)
 	fmt.Println(lang.T("Using model")+":", targetModel)
 
-	scanner := bufio.NewScanner(os.Stdin)
+	// 使用 readline 替代 bufio.Scanner
+	rl, err := readline.New("> ")
+	if err != nil {
+		fmt.Printf(lang.T("Error initializing readline")+": %v\n", err)
+		return
+	}
+	defer rl.Close()
+
 	messages := make([]llm.Message, 0)
 
 	for {
-		fmt.Print("\n> ")
-		if !scanner.Scan() {
+		// 使用 readline 读取输入
+		input, err := rl.Readline()
+		if err != nil { // io.EOF, readline.ErrInterrupt
 			break
 		}
 
-		input := strings.TrimSpace(scanner.Text())
+		input = strings.TrimSpace(input)
 		if input == "" {
 			continue
 		}
@@ -93,12 +101,21 @@ func runAI(cmd *cobra.Command, args []string) {
 			Content: input,
 		})
 
+		// 显示加载动画
+		fmt.Println() // 确保在新行显示动画
+		done := make(chan bool)
+		go showLoadingAnimation(done)
+
 		// 发送请求
 		resp, err := provider.Complete(context.Background(), llm.CompletionRequest{
 			Model:     model,
 			Messages:  messages,
 			MaxTokens: maxTokens,
 		})
+
+		// 停止加载动画
+		done <- true
+		time.Sleep(100 * time.Millisecond) // 确保动画完全停止
 
 		if err != nil {
 			fmt.Printf(lang.T("Error")+": %v\n", err)
@@ -112,5 +129,24 @@ func runAI(cmd *cobra.Command, args []string) {
 		})
 
 		fmt.Printf("\n%s\n", resp.Content)
+	}
+}
+
+func showLoadingAnimation(done chan bool) {
+	spinChars := []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
+	i := 0
+
+	for {
+		select {
+		case <-done:
+			// 使用更多空格确保完全清除动画行
+			fmt.Print("\r                                                                \r")
+			return
+		default:
+			// 确保每次更新都完全覆盖前一次的输出
+			fmt.Printf("\r%-50s", fmt.Sprintf("%s "+lang.T("Thinking")+"... ", spinChars[i]))
+			i = (i + 1) % len(spinChars)
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 }
