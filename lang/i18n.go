@@ -18,6 +18,15 @@ var (
 
 // Init initializes the i18n system
 func init() {
+	SetupI18n("")
+}
+
+// SetupI18n 设置国际化配置并初始化语言
+func SetupI18n(localePath string) {
+	if localePath != "" {
+		LocalePath = localePath
+	}
+
 	bundle = i18n.NewBundle(language.English)
 	bundle.RegisterUnmarshalFunc("json", json.Unmarshal)
 
