@@ -1,120 +1,58 @@
 package deepseek
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/sjzsdu/wn/llm"
+	"github.com/sjzsdu/wn/llm/providers/base"
 )
 
 const (
+	name               = "deepseek"
 	defaultAPIEndpoint = "https://api.deepseek.com/v1/chat/completions"
 )
 
-// Provider 实现DeepSeek的大模型提供商
 type Provider struct {
-	apiKey      string
-	apiEndpoint string
-	client      *http.Client
-	model       string
-	models      []string
+	base.Provider
 }
 
-// 确保Provider实现了llm.Provider接口
-var _ llm.Provider = (*Provider)(nil)
-
-// New 创建一个新的DeepSeek提供商
 func New(options map[string]interface{}) (llm.Provider, error) {
 	p := &Provider{
-		apiEndpoint: defaultAPIEndpoint,
-		client:      &http.Client{},
-		models:      []string{"deepseek-chat", "deepseek-coder"},
-		model:       "deepseek-chat",
+		Provider: base.Provider{
+			APIEndpoint: defaultAPIEndpoint,
+			Client:      &http.Client{},
+			Models:      []string{"deepseek-chat", "deepseek-coder"},
+			Model:       "deepseek-chat",
+			Pname:       name,
+		},
 	}
 
-	// 从 options 中获取配置
+	// 设置响应解析器
+	p.Provider.SetParser(p)
+
 	apiKey, ok := options["WN_DEEPSEEK_APIKEY"].(string)
 	if !ok || apiKey == "" {
 		return nil, fmt.Errorf("deepseek: WN_DEEPSEEK_APIKEY is required")
 	}
-	p.apiKey = apiKey
+	p.APIKey = apiKey
 
 	if endpoint, ok := options["WN_DEEPSEEK_ENDPOINT"].(string); ok && endpoint != "" {
-		p.apiEndpoint = endpoint
+		p.APIEndpoint = endpoint
 	}
 	if models, ok := options["WN_DEEPSEEK_MODELS"].([]string); ok && len(models) > 0 {
-		p.models = models
+		p.Models = models
 	}
-
 	if model, ok := options["WN_DEEPSEEK_MODEL"].(string); ok {
-		p.model = model
+		p.Model = model
 	}
 
 	return p, nil
 }
 
-// Name 返回提供商名称
-func (p *Provider) Name() string {
-	return "deepseek"
-}
-
-// AvailableModels 返回支持的模型列表
-func (p *Provider) AvailableModels() []string {
-	return p.models
-}
-
-func (p *Provider) SetModel(model string) string {
-	if model == "" {
-		return p.model
-	}
-	p.model = model
-	return p.model
-}
-
-// Complete 发送请求到DeepSeek并获取回复
-func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
-	deepseekReq := struct {
-		Model     string        `json:"model"`
-		Messages  []llm.Message `json:"messages"`
-		MaxTokens int           `json:"max_tokens,omitempty"`
-	}{
-		Model:     req.Model,
-		Messages:  req.Messages,
-		MaxTokens: req.MaxTokens,
-	}
-
-	if deepseekReq.Model == "" {
-		deepseekReq.Model = "deepseek-chat" // 默认模型
-	}
-
-	reqBody, err := json.Marshal(deepseekReq)
-	if err != nil {
-		return llm.CompletionResponse{}, fmt.Errorf("marshal request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", p.apiEndpoint, bytes.NewReader(reqBody))
-	if err != nil {
-		return llm.CompletionResponse{}, fmt.Errorf("create request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
-
-	resp, err := p.client.Do(httpReq)
-	if err != nil {
-		return llm.CompletionResponse{}, fmt.Errorf("do request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return llm.CompletionResponse{}, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
-	}
-
+func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error) {
 	var deepseekResp struct {
 		Choices []struct {
 			Message struct {
@@ -129,7 +67,7 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 		} `json:"usage"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&deepseekResp); err != nil {
+	if err := json.NewDecoder(body).Decode(&deepseekResp); err != nil {
 		return llm.CompletionResponse{}, fmt.Errorf("decode response: %w", err)
 	}
 
@@ -149,5 +87,5 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 }
 
 func init() {
-	llm.Register("deepseek", New)
+	llm.Register(name, New)
 }
