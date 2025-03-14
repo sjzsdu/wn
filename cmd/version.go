@@ -13,9 +13,8 @@ var versionCmd = &cobra.Command{
 	Short: lang.T("Print version information"),
 	Long:  lang.T("Print detailed version information of wn"),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(lang.T("wn version {{.Version}}", map[string]interface{}{
-			"Version": share.VERSION,
-		}))
+		// 使用简单的字符串拼接替代模板
+		fmt.Printf("%s: %s\n", lang.T("wn version"), share.VERSION)
 	},
 }
 
