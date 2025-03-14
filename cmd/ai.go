@@ -32,7 +32,7 @@ var aiCmd = &cobra.Command{
 
 func init() {
 	aiCmd.Flags().StringVarP(&providerName, "provider", "c", "", lang.T("LLM model Provider"))
-	aiCmd.Flags().StringVarP(&model, "model", "m", "gpt-3.5-turbo", lang.T("LLM model to use"))
+	aiCmd.Flags().StringVarP(&model, "model", "m", "", lang.T("LLM model to use"))
 	aiCmd.Flags().IntVarP(&maxTokens, "max-tokens", "t", 2000, lang.T("Maximum tokens for response"))
 	aiCmd.Flags().BoolVar(&listProviders, "providers", false, lang.T("List available LLM providers"))
 	aiCmd.Flags().BoolVar(&listModels, "models", false, lang.T("List available models for current provider"))
@@ -67,7 +67,8 @@ func runAI(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Println(lang.T("Start chatting with AI") + " (" + lang.T("Enter 'quit' or 'exit' to end the conversation") + ")")
-	fmt.Println(lang.T("Using model")+":", model)
+	targetModel := provider.SetModel(model)
+	fmt.Println(lang.T("Using model")+":", targetModel)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	messages := make([]llm.Message, 0)

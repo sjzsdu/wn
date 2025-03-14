@@ -40,4 +40,6 @@ type Provider interface {
 
 	// AvailableModels 返回该提供商支持的模型列表
 	AvailableModels() []string
+
+	SetModel(model string) string
 }

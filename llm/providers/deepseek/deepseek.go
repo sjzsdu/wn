@@ -20,6 +20,7 @@ type Provider struct {
 	apiKey      string
 	apiEndpoint string
 	client      *http.Client
+	model       string
 	models      []string
 }
 
@@ -32,6 +33,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 		apiEndpoint: defaultAPIEndpoint,
 		client:      &http.Client{},
 		models:      []string{"deepseek-chat", "deepseek-coder"},
+		model:       "deepseek-chat",
 	}
 
 	// 从 options 中获取配置
@@ -48,6 +50,10 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 		p.models = models
 	}
 
+	if model, ok := options["WN_DEEPSEEK_MODEL"].(string); ok {
+		p.model = model
+	}
+
 	return p, nil
 }
 
@@ -59,6 +65,14 @@ func (p *Provider) Name() string {
 // AvailableModels 返回支持的模型列表
 func (p *Provider) AvailableModels() []string {
 	return p.models
+}
+
+func (p *Provider) SetModel(model string) string {
+	if model == "" {
+		return p.model
+	}
+	p.model = model
+	return p.model
 }
 
 // Complete 发送请求到DeepSeek并获取回复

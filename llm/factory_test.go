@@ -22,6 +22,10 @@ func (m *mockProvider) Name() string {
 	return "mock"
 }
 
+func (m *mockProvider) SetModel(model string) string {
+	return "mock-model"
+}
+
 // 修正Complete方法的签名以匹配Provider接口
 func (m *mockProvider) Complete(ctx context.Context, req CompletionRequest) (CompletionResponse, error) {
 	return CompletionResponse{
