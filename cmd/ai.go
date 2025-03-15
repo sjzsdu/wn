@@ -9,6 +9,7 @@ import (
 	"github.com/chzyer/readline"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
+	"github.com/sjzsdu/wn/output/ai"
 	"github.com/spf13/cobra"
 
 	_ "github.com/sjzsdu/wn/llm/providers/deepseek"
@@ -77,13 +78,25 @@ func runAI(cmd *cobra.Command, args []string) {
 		return
 	}
 	defer rl.Close()
+	// 创建一个父 context 用于处理整个会话的取消
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// 设置 readline 的中断处理
+	rl.SetVimMode(false)
+	rl.Config.InterruptPrompt = "^C"
+	rl.Config.EOFPrompt = "exit"
 
 	messages := make([]llm.Message, 0)
 
 	for {
-		// 使用 readline 读取输入
 		input, err := rl.Readline()
-		if err != nil { // io.EOF, readline.ErrInterrupt
+		if err != nil {
+			// 处理中断信号，给出更友好的提示
+			if err == readline.ErrInterrupt {
+				fmt.Println("\n" + lang.T("Chat session terminated, thanks for using!"))
+			}
+			cancel() // 取消所有操作
 			break
 		}
 
@@ -92,37 +105,48 @@ func runAI(cmd *cobra.Command, args []string) {
 			continue
 		}
 		if input == "quit" || input == "exit" {
+			ai.Output(output, messages)
 			break
 		}
 
-		// 添加用户消息
 		messages = append(messages, llm.Message{
 			Role:    "user",
 			Content: input,
 		})
 
-		// 显示加载动画
-		fmt.Println() // 确保在新行显示动画
+		fmt.Println()
 		done := make(chan bool)
 		go showLoadingAnimation(done)
 
+		// 为每个请求创建一个带超时的子 context
+		requestCtx, requestCancel := context.WithTimeout(ctx, 30*time.Second)
+
 		// 发送请求
-		resp, err := provider.Complete(context.Background(), llm.CompletionRequest{
+		resp, err := provider.Complete(requestCtx, llm.CompletionRequest{
 			Model:     model,
 			Messages:  messages,
 			MaxTokens: maxTokens,
 		})
 
-		// 停止加载动画
+		// 停止加载动画并清理资源
 		done <- true
-		time.Sleep(100 * time.Millisecond) // 确保动画完全停止
+		requestCancel()
+		time.Sleep(100 * time.Millisecond)
 
+		// 错误处理
 		if err != nil {
-			fmt.Printf(lang.T("Error")+": %v\n", err)
+			switch {
+			case ctx.Err() == context.Canceled:
+				fmt.Println("\n" + lang.T("操作已取消"))
+				return
+			case requestCtx.Err() == context.DeadlineExceeded:
+				fmt.Println("\n" + lang.T("请求超时"))
+			default:
+				fmt.Printf("\n"+lang.T("Error")+": %v\n", err)
+			}
 			continue
 		}
 
-		// 添加 AI 回复到消息历史
 		messages = append(messages, llm.Message{
 			Role:    "assistant",
 			Content: resp.Content,
@@ -132,21 +156,21 @@ func runAI(cmd *cobra.Command, args []string) {
 	}
 }
 
+// showLoadingAnimation 函数也需要优化以支持取消
 func showLoadingAnimation(done chan bool) {
 	spinChars := []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
 	i := 0
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-done:
-			// 使用更多空格确保完全清除动画行
 			fmt.Print("\r                                                                \r")
 			return
-		default:
-			// 确保每次更新都完全覆盖前一次的输出
+		case <-ticker.C:
 			fmt.Printf("\r%-50s", fmt.Sprintf("%s "+lang.T("Thinking")+"... ", spinChars[i]))
 			i = (i + 1) % len(spinChars)
-			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }

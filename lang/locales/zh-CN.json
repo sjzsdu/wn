@@ -44,5 +44,6 @@
     "Use \"wn help [command]\" for more information about a command.": "使用 \"wn help [命令]\" 获取命令的更多信息。",
     "help": "帮助",
     "Print the help information": "打印帮助信息",
-    "Options:": "选项："
+    "Options:": "选项：",
+    "Chat session terminated, thanks for using!": "会话已终止，感谢使用！"
 }

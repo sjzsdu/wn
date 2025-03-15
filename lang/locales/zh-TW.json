@@ -29,5 +29,6 @@
     "Available LLM providers": "可用的大模型提供商",
     "Available models for provider": "當前提供商支持的模型",
     "Start chatting with AI": "開始與 AI 對話",
-    "Using model": "正在使用模型"
+    "Using model": "正在使用模型",
+    "Chat session terminated, thanks for using!": "會話已終止，感謝使用！"
 }
