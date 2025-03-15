@@ -89,7 +89,8 @@ func runAgent(cmd *cobra.Command, args []string) {
 	}
 
 	if showAgent != "" {
-		agent.ShowAgentContent(showAgent)
+		content := agent.ShowAgentContent(showAgent)
+		fmt.Printf(content)
 		return
 	}
 

@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/chzyer/readline"
+	"github.com/sjzsdu/wn/agent"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/output/ai"
+	"github.com/sjzsdu/wn/share"
 	"github.com/spf13/cobra"
 
 	_ "github.com/sjzsdu/wn/llm/providers/deepseek"
@@ -22,6 +24,7 @@ var (
 	maxTokens     int
 	listProviders bool
 	listModels    bool
+	useAgent      string // 新增 agent 参数
 )
 
 var aiCmd = &cobra.Command{
@@ -37,6 +40,7 @@ func init() {
 	aiCmd.Flags().IntVarP(&maxTokens, "max-tokens", "t", 2000, lang.T("Maximum tokens for response"))
 	aiCmd.Flags().BoolVar(&listProviders, "providers", false, lang.T("List available LLM providers"))
 	aiCmd.Flags().BoolVar(&listModels, "models", false, lang.T("List available models for current provider"))
+	aiCmd.Flags().StringVarP(&useAgent, "agent", "a", "", lang.T("AI use agent name"))
 	rootCmd.AddCommand(aiCmd)
 
 	llm.Init()
@@ -87,7 +91,13 @@ func runAI(cmd *cobra.Command, args []string) {
 	rl.Config.InterruptPrompt = "^C"
 	rl.Config.EOFPrompt = "exit"
 
-	messages := make([]llm.Message, 0)
+	// 替换原来的消息初始化
+	var messages []llm.Message
+	if useAgent != "" {
+		messages = agent.GetAgentMessages(useAgent)
+	} else {
+		messages = make([]llm.Message, 0)
+	}
 
 	for {
 		input, err := rl.Readline()
@@ -119,7 +129,7 @@ func runAI(cmd *cobra.Command, args []string) {
 		go showLoadingAnimation(done)
 
 		// 为每个请求创建一个带超时的子 context
-		requestCtx, requestCancel := context.WithTimeout(ctx, 30*time.Second)
+		requestCtx, requestCancel := context.WithTimeout(ctx, share.TIMEOUT)
 
 		// 发送请求
 		resp, err := provider.Complete(requestCtx, llm.CompletionRequest{

@@ -184,17 +184,26 @@ func DeleteExistingAgent(name string) {
 	fmt.Println(lang.T("Agent deleted successfully"))
 }
 
-// ShowAgentContent 显示代理内容
-func ShowAgentContent(name string) {
+// GetAgentContent 获取代理内容，优先从用户目录获取
+func GetAgentContent(name string) string {
+	// 优先检查用户代理
 	if content, exists := userAgents[name]; exists {
-		fmt.Println(content)
-		return
+		return content
 	}
+	// 找不到再检查系统代理
 	if content, exists := systemAgents[name]; exists {
-		fmt.Println(content)
-		return
+		return content
 	}
-	fmt.Printf(lang.T("Agent not found: %s\n"), name)
+	return ""
+}
+
+// ShowAgentContent 显示代理内容
+func ShowAgentContent(name string) string {
+	content := GetAgentContent(name)
+	if content == "" {
+		fmt.Printf(lang.T("Agent not found: %s\n"), name)
+	}
+	return content
 }
 
 func getAgentDirs() (string, string) {
@@ -241,7 +250,7 @@ func SaveAgent(name, content string) {
 		delete(userAgents, name)
 		return
 	}
-	
+
 	if _, existed := userAgents[name]; existed {
 		fmt.Println(lang.T("Agent updated successfully"))
 	} else {
