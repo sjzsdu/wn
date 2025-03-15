@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/sjzsdu/wn/share"
 )
 
 // FileInfo 包含文件的基本信息
@@ -296,4 +298,15 @@ func matchGitignoreRule(path, rule string) bool {
 		}
 		return false
 	}
+}
+
+func GetPath(subPath string) string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "/"
+	}
+
+	configFile := filepath.Join(homeDir, share.PATH, subPath)
+
+	return configFile
 }

@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/sjzsdu/wn/helper"
+	"github.com/sjzsdu/wn/share"
 )
 
 var configMap map[string]string
@@ -21,19 +24,14 @@ func init() {
 
 func GetConfig(key string) string {
 	envKey := key
-	if !strings.HasPrefix(key, "WN_") {
+	if !strings.HasPrefix(key, share.PREFIX) {
 		envKey = GetEnvKey(key)
 	}
 	return os.Getenv(envKey)
 }
 
 func LoadConfig() error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	configFile := filepath.Join(homeDir, ".wn", "config")
+	configFile := helper.GetPath("config")
 	file, err := os.Open(configFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -86,13 +84,13 @@ func SaveConfig() error {
 }
 
 func GetEnvKey(flagKey string) string {
-	return "WN_" + strings.ToUpper(flagKey)
+	return share.PREFIX + strings.ToUpper(flagKey)
 }
 
 // SetConfig 设置配置值并更新环境变量
 func SetConfig(key, value string) {
 	envKey := key
-	if !strings.HasPrefix(key, "WN_") {
+	if !strings.HasPrefix(key, share.PREFIX) {
 		envKey = GetEnvKey(key)
 	}
 	configMap[envKey] = value
@@ -102,7 +100,7 @@ func SetConfig(key, value string) {
 // ClearConfig 清除指定配置
 func ClearConfig(key string) {
 	envKey := key
-	if !strings.HasPrefix(key, "WN_") {
+	if !strings.HasPrefix(key, share.PREFIX) {
 		envKey = GetEnvKey(key)
 	}
 	delete(configMap, envKey)
