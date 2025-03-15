@@ -30,7 +30,17 @@ type Usage struct {
 	TotalTokens      int `json:"total_tokens"`
 }
 
-// Provider 定义大模型提供商的接口
+// StreamResponse 定义流式响应的结构
+type StreamResponse struct {
+	Content      string
+	FinishReason string
+	Done         bool
+}
+
+// StreamHandler 处理流式响应的回调函数
+type StreamHandler func(StreamResponse)
+
+// 在 Provider 接口中添加流式方法
 type Provider interface {
 	// Complete 发送请求到大模型并获取回复
 	Complete(ctx context.Context, req CompletionRequest) (CompletionResponse, error)
@@ -42,4 +52,7 @@ type Provider interface {
 	AvailableModels() []string
 
 	SetModel(model string) string
+	
+	// CompleteStream 发送流式请求到大模型并通过回调处理响应
+	CompleteStream(ctx context.Context, req CompletionRequest, handler StreamHandler) error
 }

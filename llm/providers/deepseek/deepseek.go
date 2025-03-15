@@ -86,6 +86,28 @@ func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error)
 	}, nil
 }
 
+// ParseStreamResponse 实现流式响应解析
+func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {
+	var streamResp struct {
+		Choices []struct {
+			Delta struct {
+				Content string `json:"content"`
+			} `json:"delta"`
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+		return "", "", fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if len(streamResp.Choices) == 0 {
+		return "", "", nil
+	}
+
+	return streamResp.Choices[0].Delta.Content, streamResp.Choices[0].FinishReason, nil
+}
+
 func init() {
 	llm.Register(name, New)
 }

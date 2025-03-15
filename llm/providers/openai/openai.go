@@ -30,6 +30,9 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 		},
 	}
 
+	// 设置响应解析器
+	p.Provider.SetParser(p)
+
 	apiKey, ok := options["WN_OPENAI_APIKEY"].(string)
 	if !ok || apiKey == "" {
 		return nil, fmt.Errorf("openai: WN_OPENAI_APIKEY is required")
@@ -81,6 +84,28 @@ func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error)
 			TotalTokens:      openAIResp.Usage.TotalTokens,
 		},
 	}, nil
+}
+
+// ParseStreamResponse 实现流式响应解析
+func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {
+	var streamResp struct {
+		Choices []struct {
+			Delta struct {
+				Content string `json:"content"`
+			} `json:"delta"`
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+		return "", "", fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if len(streamResp.Choices) == 0 {
+		return "", "", nil
+	}
+
+	return streamResp.Choices[0].Delta.Content, streamResp.Choices[0].FinishReason, nil
 }
 
 func init() {
