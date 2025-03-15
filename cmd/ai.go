@@ -171,12 +171,12 @@ func runAI(cmd *cobra.Command, args []string) {
 			fmt.Print("\n")
 			switch {
 			case ctx.Err() == context.Canceled:
-				fmt.Println(lang.T("操作已取消"))
+				fmt.Println(lang.T("Operation canceled"))
 				return
 			case requestCtx.Err() == context.DeadlineExceeded:
-				fmt.Printf(lang.T("请求超时，原因：%v\n"), streamErr)
+				fmt.Printf(lang.T("Request timeout, reason: %v\n"), streamErr)
 			default:
-				fmt.Printf(lang.T("请求失败：%v\n"), streamErr)
+				fmt.Printf(lang.T("Request failed: %v\n"), streamErr)
 			}
 			continue
 		}
