@@ -125,57 +125,58 @@ func runAI(cmd *cobra.Command, args []string) {
 		})
 
 		fmt.Println()
-		done := make(chan bool)
 		responseStarted := false
-
-		// 创建一个用于同步的 channel
+		loadingDone := make(chan bool)
 		completed := make(chan error, 1)
 
 		// 为每个请求创建一个带超时的子 context
 		requestCtx, requestCancel := context.WithTimeout(ctx, share.TIMEOUT)
 
+		// 先启动加载动画
+		go showLoadingAnimation(loadingDone)
+
 		// 使用流式输出
 		go func() {
+			var fullContent strings.Builder
 			err := provider.CompleteStream(requestCtx, llm.CompletionRequest{
 				Model:     model,
 				Messages:  messages,
 				MaxTokens: maxTokens,
 			}, func(resp llm.StreamResponse) {
 				if !responseStarted {
-					done <- true // 停止加载动画
+					loadingDone <- true
 					responseStarted = true
+					time.Sleep(50 * time.Millisecond)
 				}
-				fmt.Print(resp.Content)
-				if resp.Done {
+				if !resp.Done {
+					fmt.Print(resp.Content)
+					fullContent.WriteString(resp.Content)
+				} else {
 					fmt.Println()
 					messages = append(messages, llm.Message{
 						Role:    "assistant",
-						Content: resp.Content,
+						Content: fullContent.String(),
 					})
 				}
 			})
 			completed <- err
 		}()
 
-		// 显示加载动画直到收到第一个响应
-		if !responseStarted {
-			go showLoadingAnimation(done)
-		}
-
 		// 等待完成或超时
-		streamErr := <-completed  // 修改这里，使用新的变量名
+		streamErr := <-completed
 		requestCancel()
 
 		// 错误处理
-		if streamErr != nil {  // 相应地修改这里的变量名
+		if streamErr != nil {
+			fmt.Print("\n")
 			switch {
 			case ctx.Err() == context.Canceled:
-				fmt.Println("\n" + lang.T("操作已取消"))
+				fmt.Println(lang.T("操作已取消"))
 				return
 			case requestCtx.Err() == context.DeadlineExceeded:
-				fmt.Println("\n" + lang.T("请求超时"))
+				fmt.Printf(lang.T("请求超时，原因：%v\n"), streamErr)
 			default:
-				fmt.Printf("\n"+lang.T("Error")+": %v\n", streamErr)
+				fmt.Printf(lang.T("请求失败：%v\n"), streamErr)
 			}
 			continue
 		}

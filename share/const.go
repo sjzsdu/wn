@@ -12,4 +12,4 @@ const PREFIX = "WN_"
 
 const PATH = ".wn"
 
-const TIMEOUT = time.Second * 60
+const TIMEOUT = time.Second * 60 * 5

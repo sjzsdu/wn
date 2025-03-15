@@ -34,9 +34,14 @@ func (m *mockProvider) Complete(ctx context.Context, req CompletionRequest) (Com
 	}, nil
 }
 
-// 移除init函数，因为它可能导致问题
-// func init() {
-// }
+// 删除旧的 StreamResponse 方法
+func (m *mockProvider) CompleteStream(ctx context.Context, req CompletionRequest, handler StreamHandler) error {
+	handler(StreamResponse{
+		Content: "mock stream content",
+		Done:    true,
+	})
+	return nil
+}
 
 func TestRegisterAndCreateProvider(t *testing.T) {
 	// 测试注册新的provider
