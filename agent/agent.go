@@ -5,11 +5,16 @@ import (
 	"github.com/sjzsdu/wn/llm"
 )
 
+const DEFAULT_AGENT = "fullstack"
+
 // GetAgentMessages 返回预设的 agent 系统消息
 func GetAgentMessages(name string) []llm.Message {
 
 	if name == "" {
 		name = config.GetConfig("default_agent")
+		if name == "" {
+			name = DEFAULT_AGENT
+		}
 	}
 	messages := make([]llm.Message, 0)
 	content := ShowAgentContent(name)

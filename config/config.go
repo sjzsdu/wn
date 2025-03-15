@@ -57,12 +57,7 @@ func LoadConfig() error {
 }
 
 func SaveConfig() error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	configDir := filepath.Join(homeDir, ".wn")
+	configDir := helper.GetPath("")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return err
 	}
