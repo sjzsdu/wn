@@ -14,6 +14,7 @@ import (
 	"github.com/sjzsdu/wn/share"
 	"github.com/spf13/cobra"
 
+	_ "github.com/sjzsdu/wn/llm/providers/claude"
 	_ "github.com/sjzsdu/wn/llm/providers/deepseek"
 	_ "github.com/sjzsdu/wn/llm/providers/openai"
 )
@@ -29,8 +30,8 @@ var (
 
 var aiCmd = &cobra.Command{
 	Use:   "ai",
-	Short: "Chat with AI", // 先使用英文，后面动态更新
-	Long:  "Start an interactive chat session with AI using configured LLM provider",
+	Short: lang.T("Chat with AI"), // 先使用英文，后面动态更新
+	Long:  lang.T("Start an interactive chat session with AI using configured LLM provider"),
 	Run:   runAI,
 }
 

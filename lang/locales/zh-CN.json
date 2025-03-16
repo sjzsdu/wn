@@ -18,8 +18,8 @@
     "List all configurations": "列出所有配置",
     "Current configurations": "当前配置",
     
-    "Chat with AI": "与 AI 对话",
-    "Start an interactive chat session with AI using configured LLM provider": "使用配置的大模型提供商开始交互式 AI 对话",
+    "Chat with AI": "AI 对话",
+    "Start an interactive chat session with AI using configured LLM provider": "启动一个基于配置的 AI 大模型交互式对话会话",
     "LLM model Provider": "大模型提供商",
     "LLM model to use": "使用的大模型",
     "Maximum tokens for response": "响应的最大 token 数",

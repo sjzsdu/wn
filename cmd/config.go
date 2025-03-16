@@ -16,7 +16,7 @@ var configCmd = &cobra.Command{
 }
 
 var (
-	flagKeys = []string{"lang", "default_provider", "default_agent", "deepseek_apikey", "deepseek_model", "openai_apikey", "openai_model"}
+	flagKeys = []string{"lang", "default_provider", "default_agent", "deepseek_apikey", "deepseek_model", "openai_apikey", "openai_model", "claude_apikey", "claude_model"}
 	listFlag bool
 )
 
@@ -26,14 +26,17 @@ func init() {
 	}
 
 	rootCmd.AddCommand(configCmd)
+	configCmd.Flags().BoolVar(&listFlag, "list", false, lang.T("List all configurations"))
 	configCmd.Flags().String("lang", config.GetConfig("lang"), lang.T("Set language"))
 	configCmd.Flags().String("default_provider", config.GetConfig("default_provider"), lang.T("Set default LLM provider"))
 	configCmd.Flags().String("default_agent", config.GetConfig("default_agent"), lang.T("Set default agent"))
+
 	configCmd.Flags().String("deepseek_apikey", config.GetConfig("deepseek_apikey"), lang.T("Set DeepSeek API Key"))
 	configCmd.Flags().String("deepseek_model", config.GetConfig("deepseek_model"), lang.T("Set DeepSeek default model"))
 	configCmd.Flags().String("openai_apikey", config.GetConfig("openai_apikey"), lang.T("Set Openai API Key"))
 	configCmd.Flags().String("openai_model", config.GetConfig("openai_model"), lang.T("Set Openai default model"))
-	configCmd.Flags().BoolVar(&listFlag, "list", false, lang.T("List all configurations"))
+	configCmd.Flags().String("claude_apikey", config.GetConfig("claude_apikey"), lang.T("Set Claude API Key"))
+	configCmd.Flags().String("claude_model", config.GetConfig("claude_model"), lang.T("Set Claude default model"))
 }
 
 func runConfig(cmd *cobra.Command, args []string) {
