@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,9 +12,11 @@ import (
 )
 
 const (
-	systemAgentsDir = "assets/agents"
-	AGENT_EXT       = ".md"
+	AGENT_EXT = ".md"
 )
+
+//go:embed agents/*.md
+var embeddedAgents embed.FS
 
 var (
 	systemAgents = make(map[string]string) // 系统级别的agents
@@ -38,6 +41,26 @@ func init() {
 }
 
 func loadAgentsFromDir(dir string, agents map[string]string) {
+	// 先尝试从嵌入的文件系统加载系统agents
+	if strings.HasSuffix(dir, "agents") {
+		entries, err := embeddedAgents.ReadDir("agents")
+		if err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() && strings.HasSuffix(entry.Name(), AGENT_EXT) {
+					name := strings.TrimSuffix(entry.Name(), AGENT_EXT)
+					content, err := embeddedAgents.ReadFile(filepath.Join("agents", entry.Name()))
+					if err == nil {
+						agents[name] = string(content)
+					}
+				}
+			}
+			return
+		} else {
+			fmt.Printf("Warning - Failed to read embedded agents: %v\n", err)
+		}
+	}
+
+	// 如果是用户agents或者嵌入文件读取失败，则从文件系统读取
 	files, err := os.ReadDir(dir)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -79,6 +102,23 @@ func ListAgents() {
 
 func listAgentsInDir(dir string) []string {
 	var agents []string
+	
+	// 如果是系统目录，从嵌入的文件系统读取
+	if dir == "agents" {
+		entries, err := embeddedAgents.ReadDir("agents")
+		if err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() && strings.HasSuffix(entry.Name(), AGENT_EXT) {
+					agents = append(agents, "- "+strings.TrimSuffix(entry.Name(), AGENT_EXT))
+				}
+			}
+			return agents
+		}
+		fmt.Printf("Warning - Failed to read embedded agents: %v\n", err)
+		return agents
+	}
+
+	// 如果是用户目录，从文件系统读取
 	files, err := os.ReadDir(dir)
 	if err != nil {
 		return agents
@@ -208,17 +248,7 @@ func ShowAgentContent(name string) string {
 
 func getAgentDirs() (string, string) {
 	userDir := helper.GetPath("agents")
-
-	// 获取项目根目录下的 assets/agents 目录
-	projectDir, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Warning - Failed to get current directory: %v\n", err)
-		projectDir = filepath.Dir(os.Args[0])
-	}
-
-	systemDir := filepath.Join(projectDir, systemAgentsDir)
-
-	return systemDir, userDir
+	return "agents", userDir
 }
 
 // SaveAgent 创建或更新代理
