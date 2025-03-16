@@ -13,6 +13,7 @@
     "Set config": "设置配置",
     "Set global configuration": "设置全局配置",
     "Set language": "设置语言",
+    "API key required": "需要设置 API 密钥",
     "Set DeepSeek API Key": "设置 DeepSeek API 密钥",
     "Set default LLM provider": "设置默认大模型提供商",
     "List all configurations": "列出所有配置",
@@ -30,6 +31,9 @@
     "Available models for provider": "当前提供商支持的模型",
     "Start chatting with AI": "开始与 AI 对话",
     "Using model": "正在使用模型",
+    "You can:": "您可以：",
+    "Set default provider using:": "设置默认提供商：",
+    "Use provider temporarily:": "临时使用提供商：",
     "Usage:": "用法：",
     "Flags:": "参数：",
     "Global Flags:": "全局参数：",
@@ -51,5 +55,7 @@
     "Read content from file": "从文件读取内容",
     "Failed to read file: %v": "读取文件失败：%v",
     "Please input content, input an empty line to finish:": "请输入内容，输入空行结束：",
-    "Failed to read input: %v": "读取输入失败：%v"
+    "Failed to read input: %v": "读取输入失败：%v",
+    "Please set API key first": "请先设置 API 密钥",
+    "Available providers and their models": "可用的提供商及其模型"
 }

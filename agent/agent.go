@@ -24,5 +24,13 @@ func GetAgentMessages(name string) []llm.Message {
 		Content: content,
 	})
 
+	if config.GetConfig("lang") != "" {
+		lang := config.GetConfig("lang")
+		messages = append(messages, llm.Message{
+			Role:    "system",
+			Content: "无论用户使用什么语言提问，你必须始终使用" + lang + "语言回复。",
+		})
+	}
+
 	return messages
 }

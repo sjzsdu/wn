@@ -51,12 +51,9 @@ func init() {
 }
 
 func runAI(cmd *cobra.Command, args []string) {
+	// 处理列出提供商的请求
 	if listProviders {
-		providers := llm.Providers()
-		fmt.Println(lang.T("Available LLM providers") + ":")
-		for _, p := range providers {
-			fmt.Printf("- %s\n", p)
-		}
+		listAvailableProviders()
 		return
 	}
 
@@ -66,12 +63,9 @@ func runAI(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// 处理列出模型的请求
 	if listModels {
-		models := provider.AvailableModels()
-		fmt.Printf(lang.T("Available models for provider")+" (%s):\n", provider.Name())
-		for _, m := range models {
-			fmt.Printf("- %s\n", m)
-		}
+		listAvailableModels(provider)
 		return
 	}
 
@@ -79,9 +73,7 @@ func runAI(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// 检查是否是管道输入
-	isPipe := !terminal.IsTerminal(int(os.Stdin.Fd()))
-
+	// 初始化消息列表
 	var messages []llm.Message
 	if useAgent != "" {
 		messages = agent.GetAgentMessages(useAgent)
@@ -89,28 +81,57 @@ func runAI(cmd *cobra.Command, args []string) {
 		messages = make([]llm.Message, 0)
 	}
 
-	// 如果是管道输入，直接处理并返回
+	// 检查是否是管道输入
+	isPipe := !terminal.IsTerminal(int(os.Stdin.Fd()))
 	if isPipe {
-		stdinContent, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			fmt.Printf(lang.T("Failed to read input: %v\n"), err)
-			return
-		}
-		cleanContent := stripAnsiCodes(string(stdinContent))
-		if cleanContent == "" {
-			return
-		}
-		messages = append(messages, llm.Message{
-			Role:    "user",
-			Content: cleanContent,
-		})
-
-		// 直接处理单次请求
-		handleSingleRequest(ctx, provider, messages, model, maxTokens)
+		handlePipeInput(ctx, provider, messages, model, maxTokens)
 		return
 	}
 
-	// 交互模式的代码
+	// 处理交互式聊天
+	startInteractiveChat(ctx, provider, messages, model, maxTokens)
+}
+
+// listAvailableProviders 列出所有可用的LLM提供商
+func listAvailableProviders() {
+	providers := llm.Providers()
+	fmt.Println(lang.T("Available LLM providers") + ":")
+	for _, p := range providers {
+		fmt.Printf("- %s\n", p)
+	}
+}
+
+// listAvailableModels 列出指定提供商的所有可用模型
+func listAvailableModels(provider llm.Provider) {
+	models := provider.AvailableModels()
+	fmt.Printf(lang.T("Available models for provider")+" (%s):\n", provider.Name())
+	for _, m := range models {
+		fmt.Printf("- %s\n", m)
+	}
+}
+
+// handlePipeInput 处理管道输入的情况
+func handlePipeInput(ctx context.Context, provider llm.Provider, messages []llm.Message, model string, maxTokens int) {
+	stdinContent, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Printf(lang.T("Failed to read input: %v\n"), err)
+		return
+	}
+	cleanContent := stripAnsiCodes(string(stdinContent))
+	if cleanContent == "" {
+		return
+	}
+	messages = append(messages, llm.Message{
+		Role:    "user",
+		Content: cleanContent,
+	})
+
+	// 直接处理单次请求
+	handleSingleRequest(ctx, provider, messages, model, maxTokens)
+}
+
+// startInteractiveChat 启动交互式聊天会话
+func startInteractiveChat(ctx context.Context, provider llm.Provider, messages []llm.Message, model string, maxTokens int) {
 	fmt.Println(lang.T("Start chatting with AI") + " (" + lang.T("Enter 'quit' or 'exit' to end the conversation") + ")")
 	targetModel := provider.SetModel(model)
 	fmt.Println(lang.T("Using model")+":", targetModel)
@@ -127,8 +148,6 @@ func runAI(cmd *cobra.Command, args []string) {
 	rl.SetVimMode(false)
 	rl.Config.InterruptPrompt = "^C"
 	rl.Config.EOFPrompt = "exit"
-
-	// 删除重复的消息初始化代码，因为已经在前面初始化过了
 
 	for {
 		input, err := rl.Readline()
@@ -155,69 +174,75 @@ func runAI(cmd *cobra.Command, args []string) {
 			Content: input,
 		})
 
-		fmt.Println()
-		responseStarted := false
-		loadingDone := make(chan bool, 1) // 改为带缓冲的通道
-		completed := make(chan error, 1)
-
-		// 为每个请求创建一个带超时的子 context
-		requestCtx, requestCancel := context.WithTimeout(ctx, share.TIMEOUT)
-
-		// 先启动加载动画
-		go showLoadingAnimation(loadingDone)
-
-		// 使用流式输出
-		go func() {
-			var fullContent strings.Builder
-			err := provider.CompleteStream(requestCtx, llm.CompletionRequest{
-				Model:     model,
-				Messages:  messages,
-				MaxTokens: maxTokens,
-			}, func(resp llm.StreamResponse) {
-				if !responseStarted {
-					loadingDone <- true
-					responseStarted = true
-				}
-				if !resp.Done {
-					fmt.Print(resp.Content)
-					fullContent.WriteString(resp.Content)
-				} else {
-					messages = append(messages, llm.Message{
-						Role:    "assistant",
-						Content: fullContent.String(),
-					})
-				}
-			})
-			completed <- err
-			if !responseStarted {
-				loadingDone <- true // 确保在错误情况下也能停止加载动画
-			}
-		}()
-
-		// 等待完成或超时
-		streamErr := <-completed
-		requestCancel()
-
-		// 错误处理
-		if streamErr != nil {
-			if !responseStarted {
-				fmt.Print("\r                                                                \r")
-			}
-			fmt.Print("\n")
-			switch {
-			case streamErr == context.Canceled || strings.Contains(streamErr.Error(), "context canceled"):
-				fmt.Println(lang.T("Operation canceled"))
-				return
-			case streamErr == context.DeadlineExceeded || requestCtx.Err() == context.DeadlineExceeded:
-				fmt.Printf(lang.T("Request timeout, reason: %v\n"), streamErr)
-			default:
-				fmt.Printf(lang.T("Request failed: %v\n"), streamErr)
-			}
-			continue
-		}
-
-		fmt.Println()
+		// 处理单次对话请求
+		processChatRequest(ctx, provider, messages, model, maxTokens)
 	}
+}
+
+// processChatRequest 处理单次对话请求并更新消息历史
+func processChatRequest(ctx context.Context, provider llm.Provider, messages []llm.Message, model string, maxTokens int) {
+	fmt.Println()
+	responseStarted := false
+	loadingDone := make(chan bool, 1)
+	completed := make(chan error, 1)
+
+	// 为每个请求创建一个带超时的子 context
+	requestCtx, requestCancel := context.WithTimeout(ctx, share.TIMEOUT)
+	defer requestCancel()
+
+	// 先启动加载动画
+	go showLoadingAnimation(loadingDone)
+
+	// 使用流式输出
+	go func() {
+		var fullContent strings.Builder
+		err := provider.CompleteStream(requestCtx, llm.CompletionRequest{
+			Model:     model,
+			Messages:  messages,
+			MaxTokens: maxTokens,
+		}, func(resp llm.StreamResponse) {
+			if !responseStarted {
+				loadingDone <- true
+				responseStarted = true
+			}
+			if !resp.Done {
+				fmt.Print(resp.Content)
+				fullContent.WriteString(resp.Content)
+			} else {
+				messages = append(messages, llm.Message{
+					Role:    "assistant",
+					Content: fullContent.String(),
+				})
+			}
+		})
+		completed <- err
+		if !responseStarted {
+			loadingDone <- true // 确保在错误情况下也能停止加载动画
+		}
+	}()
+
+	// 等待完成或超时
+	streamErr := <-completed
+
+	// 错误处理
+	if streamErr != nil {
+		if !responseStarted {
+			fmt.Print("\r                                                                \r")
+		}
+		fmt.Print("\n")
+		switch {
+		case streamErr == context.Canceled || strings.Contains(streamErr.Error(), "context canceled"):
+			fmt.Println(lang.T("Operation canceled"))
+			return
+		case streamErr == context.DeadlineExceeded || requestCtx.Err() == context.DeadlineExceeded:
+			fmt.Printf(lang.T("Request timeout, reason: %v\n"), streamErr)
+		default:
+			fmt.Printf(lang.T("Request failed: %v\n"), streamErr)
+		}
+		return
+	}
+
+	fmt.Println()
 }
 
 // showLoadingAnimation 函数也需要优化以支持取消

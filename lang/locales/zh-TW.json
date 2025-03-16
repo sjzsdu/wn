@@ -51,5 +51,8 @@
     "Read content from file": "從文件讀取內容",
     "Failed to read file: %v": "讀取文件失敗：%v",
     "Please input content, input an empty line to finish:": "請輸入內容，輸入空行結束：",
-    "Failed to read input: %v": "讀取輸入失敗：%v"
+    "Failed to read input: %v": "讀取輸入失敗：%v",
+    "You can:": "您可以：",
+    "Set default provider using:": "設置默認提供商：",
+    "Use provider temporarily:": "臨時使用提供商："
 }
