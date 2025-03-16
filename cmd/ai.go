@@ -3,6 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -10,9 +13,9 @@ import (
 	"github.com/sjzsdu/wn/agent"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
-	"github.com/sjzsdu/wn/output/ai"
 	"github.com/sjzsdu/wn/share"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 
 	_ "github.com/sjzsdu/wn/llm/providers/claude"
 	_ "github.com/sjzsdu/wn/llm/providers/deepseek"
@@ -72,6 +75,42 @@ func runAI(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// 创建一个父 context 用于处理整个会话的取消
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// 检查是否是管道输入
+	isPipe := !terminal.IsTerminal(int(os.Stdin.Fd()))
+
+	var messages []llm.Message
+	if useAgent != "" {
+		messages = agent.GetAgentMessages(useAgent)
+	} else {
+		messages = make([]llm.Message, 0)
+	}
+
+	// 如果是管道输入，直接处理并返回
+	if isPipe {
+		stdinContent, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Printf(lang.T("Failed to read input: %v\n"), err)
+			return
+		}
+		cleanContent := stripAnsiCodes(string(stdinContent))
+		if cleanContent == "" {
+			return
+		}
+		messages = append(messages, llm.Message{
+			Role:    "user",
+			Content: cleanContent,
+		})
+
+		// 直接处理单次请求
+		handleSingleRequest(ctx, provider, messages, model, maxTokens)
+		return
+	}
+
+	// 交互模式的代码
 	fmt.Println(lang.T("Start chatting with AI") + " (" + lang.T("Enter 'quit' or 'exit' to end the conversation") + ")")
 	targetModel := provider.SetModel(model)
 	fmt.Println(lang.T("Using model")+":", targetModel)
@@ -83,32 +122,23 @@ func runAI(cmd *cobra.Command, args []string) {
 		return
 	}
 	defer rl.Close()
-	// 创建一个父 context 用于处理整个会话的取消
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// 设置 readline 的中断处理
 	rl.SetVimMode(false)
 	rl.Config.InterruptPrompt = "^C"
 	rl.Config.EOFPrompt = "exit"
 
-	// 替换原来的消息初始化
-	var messages []llm.Message
-	if useAgent != "" {
-		messages = agent.GetAgentMessages(useAgent)
-	} else {
-		messages = make([]llm.Message, 0)
-	}
+	// 删除重复的消息初始化代码，因为已经在前面初始化过了
 
 	for {
 		input, err := rl.Readline()
 		if err != nil {
-			// 处理中断信号，给出更友好的提示
-			if err == readline.ErrInterrupt {
+			if err == readline.ErrInterrupt || err == io.EOF {
 				fmt.Println("\n" + lang.T("Chat session terminated, thanks for using!"))
+				return
 			}
-			cancel() // 取消所有操作
-			break
+			fmt.Printf(lang.T("Error reading input")+": %v\n", err)
+			continue
 		}
 
 		input = strings.TrimSpace(input)
@@ -116,8 +146,8 @@ func runAI(cmd *cobra.Command, args []string) {
 			continue
 		}
 		if input == "quit" || input == "exit" {
-			ai.Output(output, messages)
-			break
+			fmt.Println(lang.T("Chat session terminated, thanks for using!"))
+			return
 		}
 
 		messages = append(messages, llm.Message{
@@ -127,7 +157,7 @@ func runAI(cmd *cobra.Command, args []string) {
 
 		fmt.Println()
 		responseStarted := false
-		loadingDone := make(chan bool)
+		loadingDone := make(chan bool, 1) // 改为带缓冲的通道
 		completed := make(chan error, 1)
 
 		// 为每个请求创建一个带超时的子 context
@@ -147,13 +177,11 @@ func runAI(cmd *cobra.Command, args []string) {
 				if !responseStarted {
 					loadingDone <- true
 					responseStarted = true
-					time.Sleep(50 * time.Millisecond)
 				}
 				if !resp.Done {
 					fmt.Print(resp.Content)
 					fullContent.WriteString(resp.Content)
 				} else {
-					fmt.Println()
 					messages = append(messages, llm.Message{
 						Role:    "assistant",
 						Content: fullContent.String(),
@@ -161,6 +189,9 @@ func runAI(cmd *cobra.Command, args []string) {
 				}
 			})
 			completed <- err
+			if !responseStarted {
+				loadingDone <- true // 确保在错误情况下也能停止加载动画
+			}
 		}()
 
 		// 等待完成或超时
@@ -169,18 +200,23 @@ func runAI(cmd *cobra.Command, args []string) {
 
 		// 错误处理
 		if streamErr != nil {
+			if !responseStarted {
+				fmt.Print("\r                                                                \r")
+			}
 			fmt.Print("\n")
 			switch {
-			case ctx.Err() == context.Canceled:
+			case streamErr == context.Canceled || strings.Contains(streamErr.Error(), "context canceled"):
 				fmt.Println(lang.T("Operation canceled"))
 				return
-			case requestCtx.Err() == context.DeadlineExceeded:
+			case streamErr == context.DeadlineExceeded || requestCtx.Err() == context.DeadlineExceeded:
 				fmt.Printf(lang.T("Request timeout, reason: %v\n"), streamErr)
 			default:
 				fmt.Printf(lang.T("Request failed: %v\n"), streamErr)
 			}
 			continue
 		}
+
+		fmt.Println()
 	}
 }
 
@@ -201,4 +237,55 @@ func showLoadingAnimation(done chan bool) {
 			i = (i + 1) % len(spinChars)
 		}
 	}
+}
+
+// 添加新的辅助函数来清理 ANSI 转义序列
+func stripAnsiCodes(s string) string {
+	ansi := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+	return ansi.ReplaceAllString(s, "")
+}
+
+// 添加新的函数处理单次请求
+func handleSingleRequest(ctx context.Context, provider llm.Provider, messages []llm.Message, model string, maxTokens int) {
+	responseStarted := false
+	loadingDone := make(chan bool, 1)
+	completed := make(chan error, 1)
+
+	requestCtx, requestCancel := context.WithTimeout(ctx, share.TIMEOUT)
+	defer requestCancel()
+
+	go showLoadingAnimation(loadingDone)
+
+	go func() {
+		var fullContent strings.Builder
+		err := provider.CompleteStream(requestCtx, llm.CompletionRequest{
+			Model:     model,
+			Messages:  messages,
+			MaxTokens: maxTokens,
+		}, func(resp llm.StreamResponse) {
+			if !responseStarted {
+				loadingDone <- true
+				responseStarted = true
+			}
+			if !resp.Done {
+				fmt.Print(resp.Content)
+				fullContent.WriteString(resp.Content)
+			}
+		})
+		completed <- err
+		if !responseStarted {
+			loadingDone <- true
+		}
+	}()
+
+	streamErr := <-completed
+	if streamErr != nil {
+		if !responseStarted {
+			fmt.Print("\r                                                                \r")
+		}
+		fmt.Print("\n")
+		fmt.Printf(lang.T("Request failed: %v\n"), streamErr)
+		return
+	}
+	fmt.Println()
 }
