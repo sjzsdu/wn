@@ -2,6 +2,7 @@ package helper
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -309,4 +310,21 @@ func GetPath(subPath string) string {
 	configFile := filepath.Join(homeDir, share.PATH, subPath)
 
 	return configFile
+}
+
+func CheckFilesExist(files string) error {
+	if files == "." {
+		return nil
+	}
+
+	for _, file := range strings.Split(files, ",") {
+		file = strings.TrimSpace(file)
+		if file == "" {
+			continue
+		}
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			return fmt.Errorf("file not found: %s", file)
+		}
+	}
+	return nil
 }
