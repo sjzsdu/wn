@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -55,4 +56,17 @@ func ExecGitCommand(name string, arg ...string) error {
 		return err
 	}
 	return nil
+}
+
+func GetCommitsBetween(from, to string) ([]string, error) {
+	cmd := exec.Command("git", "rev-list", "--reverse", fmt.Sprintf("%s..%s", from, to))
+	commits, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("获取提交列表失败: %v", err)
+	}
+	commitList := strings.Split(strings.TrimSpace(string(commits)), "\n")
+	if len(commitList) == 0 || (len(commitList) == 1 && commitList[0] == "") {
+		return nil, fmt.Errorf("没有找到需要重放的提交")
+	}
+	return commitList, nil
 }

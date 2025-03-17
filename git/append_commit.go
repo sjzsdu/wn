@@ -20,98 +20,132 @@ func AppendCommit(commitHash string, modifiedFiles string) {
 		return
 	}
 
-	currentBranchName := CurrentBranch
+	if modifiedFiles == "." {
+		appendCommitAll(commitHash)
+		return
+	}
 
-	// 获取当前分支到目标提交之后的所有提交
-	revListCmd := exec.Command("git", "rev-list", "--reverse", commitHash+"..HEAD")
-	revListOutput, err := revListCmd.Output()
+	appendCommitFiles(commitHash, strings.Split(modifiedFiles, ","))
+}
+
+func appendCommitAll(commitHash string) {
+	needCherryPicks, err := GetCommitsBetween(commitHash, "HEAD")
 	if err != nil {
 		fmt.Printf(lang.T("Failed to get commit list: %s")+"\n", err)
 		return
 	}
-	needCherryPicks := strings.Split(strings.TrimSpace(string(revListOutput)), "\n")
 
-	// 创建并切换到临时分支
+	hasStash := stashIfNeeded()
 	tempBranch := fmt.Sprintf("temp-edit-%s", commitHash[:8])
+
 	if err := ExecGitCommand("git", "checkout", "-b", tempBranch, commitHash); err != nil {
+		restoreStash(hasStash)
 		return
 	}
 
-	// 如果是指定文件，则从当前分支复制这些文件
-	if modifiedFiles != "." {
-		for _, file := range strings.Split(modifiedFiles, ",") {
-			file = strings.TrimSpace(file)
-			if file == "" {
-				continue
-			}
-			if err := ExecGitCommand("git", "checkout", currentBranchName, "--", file); err != nil {
-				ExecGitCommand("git", "checkout", currentBranchName)
-				ExecGitCommand("git", "branch", "-D", tempBranch)
-				return
-			}
-		}
-	} else {
-		// 如果是修改所有文件，直接从当前分支复制所有改动
-		if err := ExecGitCommand("git", "checkout", currentBranchName, "--", "."); err != nil {
-			ExecGitCommand("git", "checkout", currentBranchName)
-			ExecGitCommand("git", "branch", "-D", tempBranch)
-			return
-		}
+	defer cleanup(tempBranch, hasStash)
+
+	if err := ExecGitCommand("git", "checkout", CurrentBranch, "--", "."); err != nil {
+		return
 	}
 
-	// 提交修改
-	// 添加所有修改过的文件
-	if modifiedFiles != "." {
-		for _, file := range strings.Split(modifiedFiles, ",") {
-			file = strings.TrimSpace(file)
-			if file == "" {
-				continue
-			}
-			if err := ExecGitCommand("git", "add", file); err != nil {
-				ExecGitCommand("git", "checkout", currentBranchName)
-				ExecGitCommand("git", "branch", "-D", tempBranch)
-				return
-			}
-		}
-	} else {
-		if err := ExecGitCommand("git", "add", "."); err != nil {
-			ExecGitCommand("git", "checkout", currentBranchName)
-			ExecGitCommand("git", "branch", "-D", tempBranch)
-			return
-		}
+	if err := ExecGitCommand("git", "add", "."); err != nil {
+		return
 	}
 
-	// 提交修改
 	if err := ExecGitCommand("git", "commit", "--amend", "--no-edit"); err != nil {
-		ExecGitCommand("git", "checkout", currentBranchName)
-		ExecGitCommand("git", "branch", "-D", tempBranch)
 		return
 	}
 
-	// 应用后续的提交
-	for _, commit := range needCherryPicks {
+	if !applyCherryPicks(needCherryPicks) {
+		return
+	}
+
+	finalizeBranch(tempBranch)
+}
+
+func appendCommitFiles(commitHash string, files []string) {
+	needCherryPicks, err := GetCommitsBetween(commitHash, "HEAD")
+	if err != nil {
+		fmt.Printf(lang.T("Failed to get commit list: %s")+"\n", err)
+		return
+	}
+
+	hasStash := stashIfNeeded()
+	tempBranch := fmt.Sprintf("temp-edit-%s", commitHash[:8])
+
+	if err := ExecGitCommand("git", "checkout", "-b", tempBranch, commitHash); err != nil {
+		restoreStash(hasStash)
+		return
+	}
+
+	defer cleanup(tempBranch, hasStash)
+
+	for _, file := range files {
+		file = strings.TrimSpace(file)
+		if file == "" {
+			continue
+		}
+		if err := ExecGitCommand("git", "checkout", CurrentBranch, "--", file); err != nil {
+			return
+		}
+		if err := ExecGitCommand("git", "add", file); err != nil {
+			return
+		}
+	}
+
+	if err := ExecGitCommand("git", "commit", "--amend", "--no-edit"); err != nil {
+		return
+	}
+
+	if !applyCherryPicks(needCherryPicks) {
+		return
+	}
+
+	finalizeBranch(tempBranch)
+}
+
+func stashIfNeeded() bool {
+	if output, err := exec.Command("git", "status", "--porcelain").Output(); err == nil && len(output) > 0 {
+		if err := ExecGitCommand("git", "stash", "push", "-u"); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func cleanup(tempBranch string, hasStash bool) {
+	ExecGitCommand("git", "checkout", CurrentBranch)
+	ExecGitCommand("git", "branch", "-D", tempBranch)
+	restoreStash(hasStash)
+}
+
+func restoreStash(hasStash bool) {
+	if hasStash {
+		ExecGitCommand("git", "stash", "pop")
+	}
+}
+
+func applyCherryPicks(commits []string) bool {
+	for _, commit := range commits {
 		if commit == "" {
 			continue
 		}
 		if err := ExecGitCommand("git", "cherry-pick", commit); err != nil {
-			// cherry-pick 失败，可能是冲突
 			fmt.Printf(lang.T("Failed to cherry-pick commit %s, please fix it manually")+"\n", commit)
 			ExecGitCommand("git", "cherry-pick", "--abort")
-			ExecGitCommand("git", "checkout", currentBranchName)
-			ExecGitCommand("git", "branch", "-D", tempBranch)
-			return
+			return false
 		}
 	}
+	return true
+}
 
-	// 切回原分支并重置
-	if err := ExecGitCommand("git", "checkout", currentBranchName); err != nil {
+func finalizeBranch(tempBranch string) {
+	if err := ExecGitCommand("git", "checkout", CurrentBranch); err != nil {
 		return
 	}
 
 	if err := ExecGitCommand("git", "reset", "--hard", tempBranch); err != nil {
 		return
 	}
-
-	// 清理
-	ExecGitCommand("git", "branch", "-D", tempBranch)
 }

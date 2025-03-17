@@ -26,7 +26,7 @@ func init() {
 	// 修复 StringVar 参数顺序：变量指针、参数名、短参数名、默认值、描述
 	gitCmd.Flags().StringVarP(&commitHash, "commit", "c", git.LatestCommit, lang.T("commit hash"))
 	gitCmd.Flags().StringVarP(&modifiedFiles, "files", "f", ".", lang.T("files to modify"))
-	gitCmd.Flags().StringVarP(&branchName, "branch", "b", ".", lang.T("branch to rebase"))
+	gitCmd.Flags().StringVarP(&branchName, "branch", "b", "", lang.T("branch to rebase"))
 }
 
 // 避免初始化循环，将 runGit 定义为变量
@@ -42,7 +42,7 @@ var runGit = func(cmd *cobra.Command, args []string) {
 	}
 	if commitHash != "" || modifiedFiles != "" {
 		// 如果只提供了其中一个参数，提示错误
-		fmt.Println(lang.T("Both commit hash and files are required"))
+		git.AppendCommit(commitHash, modifiedFiles)
 		return
 	}
 	cmd.Help()
