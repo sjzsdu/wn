@@ -24,43 +24,40 @@ var (
 )
 
 func init() {
-	systemDir, userDir := getAgentDirs()
+	_, userDir := getAgentDirs()
 
-	// 创建必要的目录
-	if err := os.MkdirAll(systemDir, 0755); err != nil {
-		fmt.Printf("Warning - Failed to create system dir: %v\n", err)
-	}
+	// 创建用户目录
 	if err := os.MkdirAll(userDir, 0755); err != nil {
 		fmt.Printf("Warning - Failed to create user dir: %v\n", err)
 	}
 
-	// 初始化系统agents
-	loadAgentsFromDir(systemDir, systemAgents)
-	// 初始化用户agents
-	loadAgentsFromDir(userDir, userAgents)
+	// 初始化系统agents（从embed文件系统读取）
+	loadSystemAgents()
+	// 初始化用户agents（从用户目录读取）
+	loadUserAgents(userDir)
 }
 
-func loadAgentsFromDir(dir string, agents map[string]string) {
-	// 先尝试从嵌入的文件系统加载系统agents
-	if strings.HasSuffix(dir, "agents") {
-		entries, err := embeddedAgents.ReadDir("agents")
-		if err == nil {
-			for _, entry := range entries {
-				if !entry.IsDir() && strings.HasSuffix(entry.Name(), AGENT_EXT) {
-					name := strings.TrimSuffix(entry.Name(), AGENT_EXT)
-					content, err := embeddedAgents.ReadFile(filepath.Join("agents", entry.Name()))
-					if err == nil {
-						agents[name] = string(content)
-					}
-				}
-			}
-			return
-		} else {
-			fmt.Printf("Warning - Failed to read embedded agents: %v\n", err)
-		}
+// 从embed文件系统加载系统agents
+func loadSystemAgents() {
+	entries, err := embeddedAgents.ReadDir("agents")
+	if err != nil {
+		fmt.Printf("Warning - Failed to read embedded agents: %v\n", err)
+		return
 	}
 
-	// 如果是用户agents或者嵌入文件读取失败，则从文件系统读取
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), AGENT_EXT) {
+			name := strings.TrimSuffix(entry.Name(), AGENT_EXT)
+			content, err := embeddedAgents.ReadFile(filepath.Join("agents", entry.Name()))
+			if err == nil {
+				systemAgents[name] = string(content)
+			}
+		}
+	}
+}
+
+// 从用户目录加载用户agents
+func loadUserAgents(dir string) {
 	files, err := os.ReadDir(dir)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -74,7 +71,7 @@ func loadAgentsFromDir(dir string, agents map[string]string) {
 			name := strings.TrimSuffix(f.Name(), AGENT_EXT)
 			content, err := os.ReadFile(filepath.Join(dir, f.Name()))
 			if err == nil {
-				agents[name] = string(content)
+				userAgents[name] = string(content)
 			} else {
 				fmt.Printf("Warning - Failed to read file %s: %v\n", f.Name(), err)
 			}
@@ -82,44 +79,39 @@ func loadAgentsFromDir(dir string, agents map[string]string) {
 	}
 }
 
+// 可以删除原来的 loadAgentsFromDir 函数
 // ListAgents 列出所有代理
 func ListAgents() {
-	systemDir, userDir := getAgentDirs()
-
 	var output strings.Builder
 	output.WriteString(lang.T("System Agents:"))
-	if agents := listAgentsInDir(systemDir); len(agents) > 0 {
+	if agents := listSystemAgents(); len(agents) > 0 {
 		output.WriteString("\n" + strings.Join(agents, "\n"))
 	}
 	output.WriteString("\n" + lang.T("User Agents:"))
-	if agents := listAgentsInDir(userDir); len(agents) > 0 {
+	if agents := listUserAgents(); len(agents) > 0 {
 		output.WriteString("\n" + strings.Join(agents, "\n"))
 	}
 	output.WriteString("\n")
-
 	fmt.Print(output.String())
 }
 
-func listAgentsInDir(dir string) []string {
+func listSystemAgents() []string {
 	var agents []string
-	
-	// 如果是系统目录，从嵌入的文件系统读取
-	if dir == "agents" {
-		entries, err := embeddedAgents.ReadDir("agents")
-		if err == nil {
-			for _, entry := range entries {
-				if !entry.IsDir() && strings.HasSuffix(entry.Name(), AGENT_EXT) {
-					agents = append(agents, "- "+strings.TrimSuffix(entry.Name(), AGENT_EXT))
-				}
+	entries, err := embeddedAgents.ReadDir("agents")
+	if err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), AGENT_EXT) {
+				agents = append(agents, "- "+strings.TrimSuffix(entry.Name(), AGENT_EXT))
 			}
-			return agents
 		}
-		fmt.Printf("Warning - Failed to read embedded agents: %v\n", err)
-		return agents
 	}
+	return agents
+}
 
-	// 如果是用户目录，从文件系统读取
-	files, err := os.ReadDir(dir)
+func listUserAgents() []string {
+	var agents []string
+	_, userDir := getAgentDirs()
+	files, err := os.ReadDir(userDir)
 	if err != nil {
 		return agents
 	}

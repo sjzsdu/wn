@@ -81,14 +81,37 @@ func runAI(cmd *cobra.Command, args []string) {
 		messages = make([]llm.Message, 0)
 	}
 
-	// 检查是否是管道输入
+	// 检查是否有管道输入
 	isPipe := !terminal.IsTerminal(int(os.Stdin.Fd()))
 	if isPipe {
-		handlePipeInput(ctx, provider, messages, model, maxTokens)
-		return
+		stdinContent, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Printf(lang.T("Failed to read input: %v\n"), err)
+			return
+		}
+		cleanContent := stripAnsiCodes(string(stdinContent))
+		if cleanContent != "" {
+			messages = append(messages, llm.Message{
+				Role:    "user",
+				Content: cleanContent,
+			})
+			// 处理管道输入，但不退出
+			processChatRequest(ctx, provider, messages, model, maxTokens)
+		}
+		
+		// 重新打开终端设备用于后续交互
+		tty, err := os.Open("/dev/tty")
+		if err != nil {
+			fmt.Printf(lang.T("Failed to open terminal: %v\n"), err)
+			return
+		}
+		defer tty.Close()
+		
+		// 将标准输入重定向到终端
+		os.Stdin = tty
 	}
 
-	// 处理交互式聊天
+	// 继续进入交互式聊天
 	startInteractiveChat(ctx, provider, messages, model, maxTokens)
 }
 
