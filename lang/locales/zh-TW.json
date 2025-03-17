@@ -54,5 +54,11 @@
     "Failed to read input: %v": "讀取輸入失敗：%v",
     "You can:": "您可以：",
     "Set default provider using:": "設置默認提供商：",
-    "Use provider temporarily:": "臨時使用提供商："
+    "Use provider temporarily:": "臨時使用提供商：",
+    "git command": "Git 命令",
+    "Extend the git command": "擴展 Git 命令功能",
+    "Modify git commit": "修改 Git 提交",
+    "Usage: wn git <commit-hash> <modified-files>": "用法：wn git <commit-hash> <modified-files>",
+    "Git command execution failed: %s": "Git 命令執行失敗：%s",
+    "Both commit hash and files are required": "需要同時提供提交哈希值和要修改的文件"
 }
