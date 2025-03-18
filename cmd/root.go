@@ -12,10 +12,11 @@ import (
 var (
 	cmdPath          string
 	extensions       []string
-	output          string
+	output           string
 	excludes         []string
-	gitURL          string
+	gitURL           string
 	disableGitIgnore bool
+	inDebug          bool
 )
 
 var RootCmd = rootCmd
@@ -53,5 +54,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "", lang.T("Output file name"))
 	rootCmd.PersistentFlags().StringSliceVarP(&excludes, "excludes", "x", []string{}, lang.T("Glob patterns to exclude"))
 	rootCmd.PersistentFlags().StringVarP(&gitURL, "git-url", "g", "", lang.T("Git repository URL to clone and pack"))
-	rootCmd.PersistentFlags().BoolVarP(&disableGitIgnore, "disable-gitignore", "d", false, lang.T("Disable .gitignore rules"))
+	rootCmd.PersistentFlags().BoolVarP(&disableGitIgnore, "disable-gitignore", "i", false, lang.T("Disable .gitignore rules"))
+	rootCmd.PersistentFlags().BoolVarP(&inDebug, "debug", "d", false, lang.T("Debug mode"))
 }

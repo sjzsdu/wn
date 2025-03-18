@@ -9,6 +9,7 @@ import (
 
 	"github.com/chzyer/readline"
 	"github.com/sjzsdu/wn/lang"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -22,23 +23,20 @@ func ShowLoadingAnimation(done chan bool) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
+	// 先打印一个换行，将加载动画放在新行
+	fmt.Println()
 	for {
 		select {
 		case <-done:
-			// 修改清理行的方式，确保不会影响后续输出
 			fmt.Print("\r\033[K")
 			return
 		case <-ticker.C:
-			fmt.Printf("\r%-50s", fmt.Sprintf("%s "+lang.T("Thinking")+"... ", spinChars[i]))
+			fmt.Printf("\r%s %s... ", spinChars[i], lang.T("Thinking"))
 			i = (i + 1) % len(spinChars)
 		}
 	}
 }
 
-// ReadFromTerminal 从终端读取输入，支持多行输入
-// prompt: 输入提示符
-// returns: 输入内容和可能的错误
-// ReadFromTerminal 从终端读取输入，支持多行输入
 func ReadFromTerminal(prompt string) (string, error) {
 	rlConfig := &readline.Config{
 		Prompt:                 prompt,
@@ -46,15 +44,13 @@ func ReadFromTerminal(prompt string) (string, error) {
 		EOFPrompt:              "exit",
 		Stdin:                  os.Stdin,
 		DisableAutoSaveHistory: true,
-		// 添加这些配置以更好地处理管道输入
-		UniqueEditLine: true,
-		FuncGetWidth:   func() int { return readline.GetScreenWidth() },
+		UniqueEditLine:         true,
+		FuncGetWidth:           func() int { return readline.GetScreenWidth() },
 		FuncIsTerminal: func() bool {
 			return readline.IsTerminal(int(os.Stdin.Fd()))
 		},
 	}
 
-	// 每次都创建新的实例
 	rl, err := readline.NewEx(rlConfig)
 	if err != nil {
 		return "", fmt.Errorf("初始化readline失败: %v", err)
@@ -76,23 +72,25 @@ func ReadFromTerminal(prompt string) (string, error) {
 			return "", fmt.Errorf("读取输入失败: %v", err)
 		}
 
-		// 检查是否为 Ctrl+Enter（通常表示为 \x0a）
+		// 检查是否为 Ctrl+Enter
 		if strings.Contains(line, "\x0a") {
 			inMultiline = true
 			buffer.WriteString(line + "\n")
+			// 打印当前行并保持提示符
+			fmt.Println(line)
 			continue
 		}
 
-		// 如果是多行模式且收到空行，则结束输入
 		if inMultiline && strings.TrimSpace(line) == "" {
 			return strings.TrimSpace(buffer.String()), nil
 		}
 
-		// 单行模式直接返回
 		if !inMultiline {
 			return strings.TrimSpace(line), nil
 		}
 
+		// 多行模式下打印当前行
+		fmt.Println(line)
 		buffer.WriteString(line + "\n")
 	}
 }
@@ -118,4 +116,38 @@ func InitTerminal() error {
 	var err error
 	rl, err = readline.NewEx(rlConfig)
 	return err
+}
+
+// readPipeContent 读取管道输入内容并返回处理后的字符串
+func ReadPipeContent() (string, error) {
+	// 保存原始的标准输入
+	originalStdin := os.Stdin
+	defer func() {
+		os.Stdin = originalStdin
+	}()
+
+	// 读取管道内容
+	content, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return "", fmt.Errorf("failed to read input: %w", err)
+	}
+
+	// 重新设置标准输入为终端
+	tty, err := os.OpenFile("/dev/tty", os.O_RDONLY, 0)
+	if err != nil {
+		return "", fmt.Errorf("failed to reopen terminal: %w", err)
+	}
+	os.Stdin = tty
+
+	// 重新初始化终端
+	if err := InitTerminal(); err != nil {
+		return "", fmt.Errorf("failed to initialize terminal: %w", err)
+	}
+
+	// 确保终端已经准备好
+	if !terminal.IsTerminal(int(os.Stdin.Fd())) {
+		return "", fmt.Errorf("failed to initialize terminal")
+	}
+
+	return StripAnsiCodes(string(content)), nil
 }

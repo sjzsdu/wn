@@ -8,6 +8,7 @@ import (
 
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
+	"github.com/sjzsdu/wn/share"
 )
 
 const (
@@ -27,6 +28,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 			Models:      []string{"claude-2", "claude-instant-1"},
 			Model:       "claude-2",
 			Pname:       name,
+			MaxTokens:   share.MAX_TOKENS,
 		},
 	}
 

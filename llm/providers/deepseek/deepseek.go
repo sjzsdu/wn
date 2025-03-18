@@ -8,6 +8,7 @@ import (
 
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
+	"github.com/sjzsdu/wn/share"
 )
 
 const (
@@ -27,6 +28,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 			Models:      []string{"deepseek-chat", "deepseek-coder"},
 			Model:       "deepseek-chat",
 			Pname:       name,
+			MaxTokens:   share.MAX_TOKENS,
 		},
 	}
 

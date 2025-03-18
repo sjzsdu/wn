@@ -13,3 +13,5 @@ const PREFIX = "WN_"
 const PATH = ".wn"
 
 const TIMEOUT = time.Second * 60 * 5
+
+const MAX_TOKENS = 8192

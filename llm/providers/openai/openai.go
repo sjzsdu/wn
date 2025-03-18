@@ -8,6 +8,7 @@ import (
 
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
+	"github.com/sjzsdu/wn/share"
 )
 
 const (
@@ -27,6 +28,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 			Models:      []string{"gpt-3", "gpt-3.5-turbo", "gpt-4"},
 			Model:       "gpt-3.5-turbo",
 			Pname:       name,
+			MaxTokens:   share.MAX_TOKENS,
 		},
 	}
 

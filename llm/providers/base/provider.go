@@ -22,6 +22,7 @@ type Provider struct {
 	Model       string
 	Pname       string
 	parser      ResponseParser
+	MaxTokens   int
 }
 
 // ResponseParser 定义响应解析接口
@@ -88,10 +89,18 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 
 	// 构建请求体
 	reqBody := map[string]interface{}{
-		"model":       req.Model,
-		"messages":    req.Messages,
-		"max_tokens":  req.MaxTokens,
-		"stream":      true,
+		"model":      req.Model,
+		"messages":   req.Messages,
+		"max_tokens": req.MaxTokens,
+		"stream":     true,
+	}
+
+	// 使用默认值
+	if reqBody["model"] == "" {
+		reqBody["model"] = p.Model
+	}
+	if reqBody["max_tokens"] == 0 {
+		reqBody["max_tokens"] = p.MaxTokens
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -140,7 +149,7 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 		}
 
 		data := strings.TrimPrefix(line, "data: ")
-		
+
 		// 使用具体实现的解析器解析响应
 		if streamParser, ok := p.parser.(StreamResponseParser); ok {
 			content, finishReason, err := streamParser.ParseStreamResponse(data)
@@ -160,7 +169,7 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 				handler(llm.StreamResponse{
 					Content:      fullContent.String(),
 					FinishReason: finishReason,
-					Done:        true,
+					Done:         true,
 				})
 				break
 			}

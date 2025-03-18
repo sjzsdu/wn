@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/chzyer/readline"
@@ -29,6 +28,11 @@ var (
 	listProviders bool
 	listModels    bool
 	useAgent      string // 新增 agent 参数
+	messages      []llm.Message
+)
+
+const (
+	MaxRecentMessages = 2 // 保留最近的消息数量
 )
 
 var aiCmd = &cobra.Command{
@@ -41,7 +45,7 @@ var aiCmd = &cobra.Command{
 func init() {
 	aiCmd.Flags().StringVarP(&providerName, "provider", "c", "", lang.T("LLM model Provider"))
 	aiCmd.Flags().StringVarP(&model, "model", "m", "", lang.T("LLM model to use"))
-	aiCmd.Flags().IntVarP(&maxTokens, "max-tokens", "t", 2000, lang.T("Maximum tokens for response"))
+	aiCmd.Flags().IntVarP(&maxTokens, "max-tokens", "t", 0, lang.T("Maximum tokens for response"))
 	aiCmd.Flags().BoolVar(&listProviders, "providers", false, lang.T("List available LLM providers"))
 	aiCmd.Flags().BoolVar(&listModels, "models", false, lang.T("List available models for current provider"))
 	aiCmd.Flags().StringVarP(&useAgent, "agent", "a", "", lang.T("AI use agent name"))
@@ -69,17 +73,16 @@ func runAI(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	startChat(provider)
+}
+
+func startChat(provider llm.Provider) {
 	// 创建一个父 context 用于处理整个会话的取消
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// 初始化消息列表
-	var messages []llm.Message
-	if useAgent != "" {
-		messages = agent.GetAgentMessages(useAgent)
-	} else {
-		messages = make([]llm.Message, 0)
-	}
+	messages = make([]llm.Message, 0)
 
 	targetModel := provider.SetModel(model)
 	fmt.Println(lang.T("Start chatting with AI") + " (" + lang.T("Enter 'quit' or 'exit' to end the conversation") + ")")
@@ -89,49 +92,21 @@ func runAI(cmd *cobra.Command, args []string) {
 	// 检查是否有管道输入
 	isPipe := !terminal.IsTerminal(int(os.Stdin.Fd()))
 	if isPipe {
-		var pipeContent []byte
-		// 先读取管道内容
-		pipeContent, err = io.ReadAll(os.Stdin)
+		content, err := helper.ReadPipeContent()
 		if err != nil {
-			fmt.Printf(lang.T("Failed to read input: %v\n"), err)
+			fmt.Printf(lang.T("Failed to handle pipe input: %v\n"), err)
 			return
 		}
 
-		// 重新设置标准输入为终端
-		tty, err := os.OpenFile("/dev/tty", os.O_RDONLY, 0)
-		if err != nil {
-			fmt.Printf(lang.T("Failed to reopen terminal: %v\n"), err)
-			return
-		}
-		os.Stdin = tty
-
-		// 重新初始化终端
-		if err := helper.InitTerminal(); err != nil {
-			fmt.Printf(lang.T("Failed to initialize terminal: %v\n"), err)
-			return
-		}
-
-		// 确保终端已经准备好
-		if !terminal.IsTerminal(int(os.Stdin.Fd())) {
-			fmt.Println(lang.T("Failed to initialize terminal"))
-			return
-		}
-
-		// 处理管道输入
-		cleanContent := stripAnsiCodes(string(pipeContent))
-		if cleanContent != "" {
+		if content != "" {
 			messages = append(messages, llm.Message{
 				Role:    "user",
-				Content: cleanContent,
+				Content: content,
 			})
-			if err := processChatRequest(ctx, provider, messages, targetModel, maxTokens); err != nil {
-				return
-			}
 		}
 	}
 
-	// 继续进入交互式聊天
-	startInteractiveChat(ctx, provider, messages, targetModel, maxTokens)
+	startInteractiveChat(ctx, provider)
 }
 
 // listAvailableProviders 列出所有可用的LLM提供商
@@ -153,20 +128,22 @@ func listAvailableModels(provider llm.Provider) {
 }
 
 // startInteractiveChat 启动交互式聊天会话
-func startInteractiveChat(ctx context.Context, provider llm.Provider, messages []llm.Message, model string, maxTokens int) {
+func startInteractiveChat(ctx context.Context, provider llm.Provider) {
+	if len(messages) > 0 {
+		processChatRequest(ctx, provider)
+	}
 	for {
 		input, err := helper.ReadFromTerminal("> ")
 		if err != nil {
 			// 在 startInteractiveChat 函数中
 			if err == readline.ErrInterrupt || err == io.EOF {
-			    fmt.Println("\n" + lang.T("Chat session terminated, thanks for using!"))
-			    return
+				fmt.Println("\n" + lang.T("Chat session terminated, thanks for using!"))
+				return
 			}
-			
-			// 在 input == "quit" || input == "exit" 的条件分支中
-			if input == "quit" || input == "exit" {
-			    fmt.Println(lang.T("Chat session terminated, thanks for using!"))
-			    return
+
+			if input == "quit" || input == "exit" || input == "q" {
+				fmt.Println(lang.T("Chat session terminated, thanks for using!"))
+				return
 			}
 			fmt.Printf(lang.T("Error reading input")+": %v\n", err)
 			continue
@@ -176,9 +153,19 @@ func startInteractiveChat(ctx context.Context, provider llm.Provider, messages [
 		if input == "" {
 			continue
 		}
-		if input == "quit" || input == "exit" {
+
+		// 添加 debug 命令处理
+		if input == "debug" {
+			outputDebug()
+			return
+		}
+		if input == "quit" || input == "exit" || input == "q" {
 			fmt.Println(lang.T("Chat session terminated, thanks for using!"))
 			return
+		}
+
+		if inDebug {
+			fmt.Println(input)
 		}
 
 		messages = append(messages, llm.Message{
@@ -186,113 +173,140 @@ func startInteractiveChat(ctx context.Context, provider llm.Provider, messages [
 			Content: input,
 		})
 
-		if err := processChatRequest(ctx, provider, messages, model, maxTokens); err != nil {
+		if err := processChatRequest(ctx, provider); err != nil {
 			// 如果是取消操作，直接返回
 			if err == context.Canceled || strings.Contains(err.Error(), "context canceled") {
 				return
 			}
-			// 其他错误继续等待用户输入
 			continue
 		}
 	}
 }
 
+func outputDebug() {
+	fmt.Println("\n=== Debug: Messages History ===")
+	for i, msg := range messages {
+		fmt.Printf("\n[%d] Role: %s\n", i, msg.Role)
+		if msg.Role == "assistant" {
+			// 对于 AI 回复，使用不同的格式显示
+			fmt.Println("Content:")
+			fmt.Println("----------------------------------------")
+			fmt.Println(msg.Content)
+			fmt.Println("----------------------------------------")
+		} else {
+			fmt.Printf("Content: %s\n", msg.Content)
+		}
+	}
+	fmt.Println("\nTotal messages:", len(messages))
+	fmt.Println(lang.T("Chat session terminated, thanks for using!"))
+}
+
 // processChatRequest 处理单次对话请求并更新消息历史
-func processChatRequest(ctx context.Context, provider llm.Provider, messages []llm.Message, model string, maxTokens int) error {
-    responseStarted := false
-    loadingDone := make(chan bool, 1)
-    completed := make(chan error, 1)
+func processChatRequest(ctx context.Context, provider llm.Provider) error {
+	responseStarted := false
+	loadingDone := make(chan bool, 1)
+	completed := make(chan error, 1)
 
-    requestCtx, requestCancel := context.WithTimeout(ctx, share.TIMEOUT)
-    defer requestCancel()
+	requestCtx, requestCancel := context.WithTimeout(ctx, share.TIMEOUT)
+	defer requestCancel()
 
-    go helper.ShowLoadingAnimation(loadingDone)
+	go helper.ShowLoadingAnimation(loadingDone)
 
-    go func() {
-        var fullContent strings.Builder
-        contextMessages := getContextMessages(messages)
-        err := provider.CompleteStream(requestCtx, llm.CompletionRequest{
-            Model:     model,
-            Messages:  contextMessages,
-            MaxTokens: maxTokens,
-        }, func(resp llm.StreamResponse) {
-            if !responseStarted {
-                loadingDone <- true
-                responseStarted = true
-                fmt.Print("\n")
-            }
-            if !resp.Done {
-                // 直接输出原始内容，不做任何处理
-                fmt.Print(resp.Content)
-                fullContent.WriteString(resp.Content)
-            } else {
-                messages = append(messages, llm.Message{
-                    Role:    "assistant",
-                    Content: fullContent.String(),
-                })
-            }
-        })
-        completed <- err
-        if !responseStarted {
-            loadingDone <- true
-        }
-    }()
+	go func() {
+		var fullContent strings.Builder
+		contextMessages := getContextMessages()
+		if inDebug {
+			fmt.Println("\n=== Debug: Context Messages ===")
+			for i, msg := range contextMessages {
+				fmt.Printf("\n[%d] Role: %s\n", i, msg.Role)
+				fmt.Println("Content:")
+				fmt.Println("----------------------------------------")
+				fmt.Println(msg.Content)
+				fmt.Println("----------------------------------------")
+			}
+			fmt.Printf("\nTotal context messages: %d\n\n", len(contextMessages))
+		}
+		err := provider.CompleteStream(requestCtx, llm.CompletionRequest{
+			Model:     model,
+			Messages:  contextMessages,
+			MaxTokens: maxTokens,
+		}, func(resp llm.StreamResponse) {
+			handleStreamResponse(resp, &responseStarted, loadingDone, &fullContent)
+		})
+		completed <- err
+		if !responseStarted {
+			loadingDone <- true
+		}
+	}()
 
 	// 等待完成或超时
-	streamErr := <-completed
-
-	// 错误处理
-	if streamErr != nil {
-		if !responseStarted {
-			fmt.Print("\r                                                                \r")
-		}
-		fmt.Print("\n")
-		switch {
-		case streamErr == context.Canceled || strings.Contains(streamErr.Error(), "context canceled"):
-			fmt.Println(lang.T("Operation canceled"))
-			return streamErr
-		case streamErr == context.DeadlineExceeded || requestCtx.Err() == context.DeadlineExceeded:
-			fmt.Printf(lang.T("Request timeout, reason: %v\n"), streamErr)
-			return streamErr
-		default:
-			fmt.Printf(lang.T("Request failed: %v\n"), streamErr)
-			return streamErr
-		}
+	if err := handleStreamError(<-completed, responseStarted, requestCtx); err != nil {
+		return err
 	}
 
 	fmt.Println()
 	return nil
 }
 
-// 添加新的辅助函数来清理 ANSI 转义序列
-// 修改 stripAnsiCodes 函数，确保正确处理 git diff 输出
-func stripAnsiCodes(s string) string {
-	// 处理 git diff 常见的颜色代码和格式控制符
-	ansi := regexp.MustCompile(`\x1b\[[0-9;]*[mGKHF]`)
-	return strings.TrimSpace(ansi.ReplaceAllString(s, ""))
+// 处理流式响应的回调函数
+func handleStreamResponse(resp llm.StreamResponse, responseStarted *bool, loadingDone chan bool, fullContent *strings.Builder) {
+	if !*responseStarted {
+		loadingDone <- true
+		*responseStarted = true
+		fmt.Print("\n")
+	}
+	if !resp.Done {
+		fmt.Print(resp.Content)
+		fullContent.WriteString(resp.Content)
+	} else {
+		messages = append(messages, llm.Message{
+			Role:    "assistant",
+			Content: fullContent.String(),
+		})
+	}
 }
 
-// 在文件开头添加配置
-const (
-	MaxContextMessages = 5 // 保留最近5轮对话
-)
-
-// 在发送请求前处理消息历史
-func getContextMessages(messages []llm.Message) []llm.Message {
-	if len(messages) <= MaxContextMessages {
-		return messages
+// 处理流式请求的错误
+func handleStreamError(streamErr error, responseStarted bool, requestCtx context.Context) error {
+	if streamErr == nil {
+		return nil
 	}
 
-	// 保留系统消息（如果有的话）
-	var contextMessages []llm.Message
-	for _, msg := range messages {
-		if msg.Role == "system" {
-			contextMessages = append(contextMessages, msg)
-		}
+	if !responseStarted {
+		fmt.Print("\r                                                                \r")
+	}
+	fmt.Print("\n")
+
+	switch {
+	case streamErr == context.Canceled || strings.Contains(streamErr.Error(), "context canceled"):
+		fmt.Println(lang.T("Operation canceled"))
+		return streamErr
+	case streamErr == context.DeadlineExceeded || requestCtx.Err() == context.DeadlineExceeded:
+		fmt.Printf(lang.T("Request timeout, reason: %v\n"), streamErr)
+		return streamErr
+	default:
+		fmt.Printf(lang.T("Request failed: %v\n"), streamErr)
+		return streamErr
+	}
+}
+
+// getContextMessages 返回系统提示和最近的对话记录
+func getContextMessages() []llm.Message {
+	// 获取 agent 系统提示
+	contextMessages := agent.GetAgentMessages(useAgent)
+
+	// 如果没有历史消息，直接返回系统提示
+	if len(messages) == 0 {
+		return contextMessages
 	}
 
-	// 添加最近的对话
-	start := len(messages) - MaxContextMessages
+	// 获取最近的消息
+	start := len(messages)
+	if start > MaxRecentMessages {
+		start = len(messages) - MaxRecentMessages
+	}
+
+	// 添加最近的对话记录
 	contextMessages = append(contextMessages, messages[start:]...)
 
 	return contextMessages
