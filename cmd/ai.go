@@ -12,6 +12,7 @@ import (
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
+	"github.com/sjzsdu/wn/message"
 	"github.com/sjzsdu/wn/share"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
@@ -21,75 +22,77 @@ import (
 	_ "github.com/sjzsdu/wn/llm/providers/openai"
 )
 
-var (
+const (
+	MaxRecentMessages = 2 // 保留最近的消息数量
+)
+
+// 定义 AI 命令的结构体
+type aiCommand struct {
+	cmd           *cobra.Command
+	msgManager    *message.Manager
 	providerName  string
 	model         string
 	maxTokens     int
 	listProviders bool
 	listModels    bool
-	useAgent      string // 新增 agent 参数
-	messages      []llm.Message
-)
-
-const (
-	MaxRecentMessages = 2 // 保留最近的消息数量
-)
-
-var aiCmd = &cobra.Command{
-	Use:   "ai",
-	Short: lang.T("Chat with AI"), // 先使用英文，后面动态更新
-	Long:  lang.T("Start an interactive chat session with AI using configured LLM provider"),
-	Run:   runAI,
+	useAgent      string
 }
 
-func init() {
-	aiCmd.Flags().StringVarP(&providerName, "provider", "c", "", lang.T("LLM model Provider"))
-	aiCmd.Flags().StringVarP(&model, "model", "m", "", lang.T("LLM model to use"))
-	aiCmd.Flags().IntVarP(&maxTokens, "max-tokens", "t", 0, lang.T("Maximum tokens for response"))
-	aiCmd.Flags().BoolVar(&listProviders, "providers", false, lang.T("List available LLM providers"))
-	aiCmd.Flags().BoolVar(&listModels, "models", false, lang.T("List available models for current provider"))
-	aiCmd.Flags().StringVarP(&useAgent, "agent", "a", "", lang.T("AI use agent name"))
-	rootCmd.AddCommand(aiCmd)
+// 创建新的命令实例
+func newAICommand() *aiCommand {
+	cmd := &aiCommand{
+		msgManager: message.New(),
+	}
 
-	llm.Init()
+	cmd.cmd = &cobra.Command{
+		Use:   "ai",
+		Short: lang.T("Chat with AI"),
+		Long:  lang.T("Start an interactive chat session with AI using configured LLM provider"),
+		Run:   cmd.runAI,
+	}
+
+	cmd.initFlags()
+	return cmd
 }
 
-func runAI(cmd *cobra.Command, args []string) {
-	// 处理列出提供商的请求
-	if listProviders {
-		listAvailableProviders()
+func (c *aiCommand) initFlags() {
+	c.cmd.Flags().StringVarP(&c.providerName, "provider", "c", "", lang.T("LLM model Provider"))
+	c.cmd.Flags().StringVarP(&c.model, "model", "m", "", lang.T("LLM model to use"))
+	c.cmd.Flags().IntVarP(&c.maxTokens, "max-tokens", "t", 0, lang.T("Maximum tokens for response"))
+	c.cmd.Flags().BoolVar(&c.listProviders, "providers", false, lang.T("List available LLM providers"))
+	c.cmd.Flags().BoolVar(&c.listModels, "models", false, lang.T("List available models for current provider"))
+	c.cmd.Flags().StringVarP(&c.useAgent, "agent", "a", "", lang.T("AI use agent name"))
+}
+
+func (c *aiCommand) runAI(cmd *cobra.Command, args []string) {
+	if c.listProviders {
+		c.listAvailableProviders()
 		return
 	}
 
-	provider, err := llm.GetProvider(providerName, nil)
+	provider, err := llm.GetProvider(c.providerName, nil)
 	if err != nil {
 		fmt.Printf(lang.T("Error getting LLM provider")+": %v\n", err)
 		return
 	}
 
-	// 处理列出模型的请求
-	if listModels {
-		listAvailableModels(provider)
+	if c.listModels {
+		c.listAvailableModels(provider)
 		return
 	}
 
-	startChat(provider)
+	c.startChat(provider)
 }
 
-func startChat(provider llm.Provider) {
-	// 创建一个父 context 用于处理整个会话的取消
+func (c *aiCommand) startChat(provider llm.Provider) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// 初始化消息列表
-	messages = make([]llm.Message, 0)
-
-	targetModel := provider.SetModel(model)
+	targetModel := provider.SetModel(c.model)
 	fmt.Println(lang.T("Start chatting with AI") + " (" + lang.T("Enter 'quit' or 'exit' to end the conversation") + ")")
 	fmt.Println(lang.T("Tips: Press Ctrl+Enter for new line, Enter to submit"))
 	fmt.Println(lang.T("Using model")+":", targetModel)
 
-	// 检查是否有管道输入
 	isPipe := !terminal.IsTerminal(int(os.Stdin.Fd()))
 	if isPipe {
 		content, err := helper.ReadPipeContent()
@@ -99,18 +102,17 @@ func startChat(provider llm.Provider) {
 		}
 
 		if content != "" {
-			messages = append(messages, llm.Message{
+			c.msgManager.Append(llm.Message{
 				Role:    "user",
 				Content: content,
 			})
 		}
 	}
 
-	startInteractiveChat(ctx, provider)
+	c.startInteractiveChat(ctx, provider)
 }
 
-// listAvailableProviders 列出所有可用的LLM提供商
-func listAvailableProviders() {
+func (c *aiCommand) listAvailableProviders() {
 	providers := llm.Providers()
 	fmt.Println(lang.T("Available LLM providers") + ":")
 	for _, p := range providers {
@@ -118,8 +120,7 @@ func listAvailableProviders() {
 	}
 }
 
-// listAvailableModels 列出指定提供商的所有可用模型
-func listAvailableModels(provider llm.Provider) {
+func (c *aiCommand) listAvailableModels(provider llm.Provider) {
 	models := provider.AvailableModels()
 	fmt.Printf(lang.T("Available models for provider")+" (%s):\n", provider.Name())
 	for _, m := range models {
@@ -127,22 +128,18 @@ func listAvailableModels(provider llm.Provider) {
 	}
 }
 
-// startInteractiveChat 启动交互式聊天会话
-func startInteractiveChat(ctx context.Context, provider llm.Provider) {
+func (c *aiCommand) startInteractiveChat(ctx context.Context, provider llm.Provider) {
+	// 使用 msgManager 中的消息
+	messages := c.msgManager.GetAll()
 	if len(messages) > 0 {
-		processChatRequest(ctx, provider)
+		c.processChatRequest(ctx, provider)
 	}
+
 	for {
 		input, err := helper.ReadFromTerminal("> ")
 		if err != nil {
-			// 在 startInteractiveChat 函数中
 			if err == readline.ErrInterrupt || err == io.EOF {
 				fmt.Println("\n" + lang.T("Chat session terminated, thanks for using!"))
-				return
-			}
-
-			if input == "quit" || input == "exit" || input == "q" {
-				fmt.Println(lang.T("Chat session terminated, thanks for using!"))
 				return
 			}
 			fmt.Printf(lang.T("Error reading input")+": %v\n", err)
@@ -154,9 +151,9 @@ func startInteractiveChat(ctx context.Context, provider llm.Provider) {
 			continue
 		}
 
-		// 添加 debug 命令处理
+		// 特殊命令处理
 		if input == "debug" {
-			outputDebug()
+			c.outputDebug()
 			return
 		}
 		if input == "quit" || input == "exit" || input == "q" {
@@ -168,13 +165,15 @@ func startInteractiveChat(ctx context.Context, provider llm.Provider) {
 			fmt.Println(input)
 		}
 
-		messages = append(messages, llm.Message{
+		// 显示用户输入
+		fmt.Printf("> %s\n", input)
+
+		c.msgManager.Append(llm.Message{
 			Role:    "user",
 			Content: input,
 		})
 
-		if err := processChatRequest(ctx, provider); err != nil {
-			// 如果是取消操作，直接返回
+		if err := c.processChatRequest(ctx, provider); err != nil {
 			if err == context.Canceled || strings.Contains(err.Error(), "context canceled") {
 				return
 			}
@@ -183,12 +182,12 @@ func startInteractiveChat(ctx context.Context, provider llm.Provider) {
 	}
 }
 
-func outputDebug() {
+func (c *aiCommand) outputDebug() {
+	messages := c.msgManager.GetAll()
 	fmt.Println("\n=== Debug: Messages History ===")
 	for i, msg := range messages {
 		fmt.Printf("\n[%d] Role: %s\n", i, msg.Role)
 		if msg.Role == "assistant" {
-			// 对于 AI 回复，使用不同的格式显示
 			fmt.Println("Content:")
 			fmt.Println("----------------------------------------")
 			fmt.Println(msg.Content)
@@ -201,8 +200,7 @@ func outputDebug() {
 	fmt.Println(lang.T("Chat session terminated, thanks for using!"))
 }
 
-// processChatRequest 处理单次对话请求并更新消息历史
-func processChatRequest(ctx context.Context, provider llm.Provider) error {
+func (c *aiCommand) processChatRequest(ctx context.Context, provider llm.Provider) error {
 	responseStarted := false
 	loadingDone := make(chan bool, 1)
 	completed := make(chan error, 1)
@@ -214,7 +212,7 @@ func processChatRequest(ctx context.Context, provider llm.Provider) error {
 
 	go func() {
 		var fullContent strings.Builder
-		contextMessages := getContextMessages()
+		contextMessages := c.getContextMessages()
 		if inDebug {
 			fmt.Println("\n=== Debug: Context Messages ===")
 			for i, msg := range contextMessages {
@@ -226,12 +224,13 @@ func processChatRequest(ctx context.Context, provider llm.Provider) error {
 			}
 			fmt.Printf("\nTotal context messages: %d\n\n", len(contextMessages))
 		}
+
 		err := provider.CompleteStream(requestCtx, llm.CompletionRequest{
-			Model:     model,
+			Model:     c.model,
 			Messages:  contextMessages,
-			MaxTokens: maxTokens,
+			MaxTokens: c.maxTokens,
 		}, func(resp llm.StreamResponse) {
-			handleStreamResponse(resp, &responseStarted, loadingDone, &fullContent)
+			c.handleStreamResponse(resp, &responseStarted, loadingDone, &fullContent)
 		})
 		completed <- err
 		if !responseStarted {
@@ -239,8 +238,7 @@ func processChatRequest(ctx context.Context, provider llm.Provider) error {
 		}
 	}()
 
-	// 等待完成或超时
-	if err := handleStreamError(<-completed, responseStarted, requestCtx); err != nil {
+	if err := c.handleStreamError(<-completed, responseStarted, requestCtx); err != nil {
 		return err
 	}
 
@@ -248,26 +246,24 @@ func processChatRequest(ctx context.Context, provider llm.Provider) error {
 	return nil
 }
 
-// 处理流式响应的回调函数
-func handleStreamResponse(resp llm.StreamResponse, responseStarted *bool, loadingDone chan bool, fullContent *strings.Builder) {
+func (c *aiCommand) handleStreamResponse(resp llm.StreamResponse, responseStarted *bool, loadingDone chan bool, fullContent *strings.Builder) {
 	if !*responseStarted {
 		loadingDone <- true
 		*responseStarted = true
-		fmt.Print("\n")
+		<-loadingDone
 	}
 	if !resp.Done {
 		fmt.Print(resp.Content)
 		fullContent.WriteString(resp.Content)
 	} else {
-		messages = append(messages, llm.Message{
+		c.msgManager.Append(llm.Message{
 			Role:    "assistant",
 			Content: fullContent.String(),
 		})
 	}
 }
 
-// 处理流式请求的错误
-func handleStreamError(streamErr error, responseStarted bool, requestCtx context.Context) error {
+func (c *aiCommand) handleStreamError(streamErr error, responseStarted bool, requestCtx context.Context) error {
 	if streamErr == nil {
 		return nil
 	}
@@ -290,24 +286,25 @@ func handleStreamError(streamErr error, responseStarted bool, requestCtx context
 	}
 }
 
-// getContextMessages 返回系统提示和最近的对话记录
-func getContextMessages() []llm.Message {
-	// 获取 agent 系统提示
-	contextMessages := agent.GetAgentMessages(useAgent)
+func (c *aiCommand) getContextMessages() []llm.Message {
+	contextMessages := agent.GetAgentMessages(c.useAgent)
+	messages := c.msgManager.GetAll()
 
-	// 如果没有历史消息，直接返回系统提示
 	if len(messages) == 0 {
 		return contextMessages
 	}
 
-	// 获取最近的消息
-	start := len(messages)
-	if start > MaxRecentMessages {
+	// 计算开始位置：如果消息数量超过限制，只取最后 MaxRecentMessages 条
+	start := 0
+	if len(messages) > MaxRecentMessages {
 		start = len(messages) - MaxRecentMessages
 	}
 
-	// 添加最近的对话记录
-	contextMessages = append(contextMessages, messages[start:]...)
+	return append(contextMessages, messages[start:]...)
+}
 
-	return contextMessages
+func init() {
+	aiCmd := newAICommand()
+	rootCmd.AddCommand(aiCmd.cmd)
+	llm.Init()
 }

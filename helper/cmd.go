@@ -23,12 +23,11 @@ func ShowLoadingAnimation(done chan bool) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
-	// 先打印一个换行，将加载动画放在新行
-	fmt.Println()
 	for {
 		select {
 		case <-done:
-			fmt.Print("\r\033[K")
+			fmt.Print("\n") // 清除当前行
+			done <- false   // 发送 false 表示动画已清理完成
 			return
 		case <-ticker.C:
 			fmt.Printf("\r%s %s... ", spinChars[i], lang.T("Thinking"))
