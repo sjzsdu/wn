@@ -189,74 +189,58 @@ func packToPDF(files []string) ([]byte, error) {
 // 修改 Pack 相关函数，确保文件按照固定顺序处理
 
 // 添加一个新的结构体来保存文件信息
-type FileEntry struct {
-	Name    string
-	Content string
+type fileEntry struct {
+    Name    string
+    Content string
 }
 
-// 修改 PackToText 函数
+// 添加一个辅助函数来对文件进行排序
+func sortFileEntries(files map[string]string) []fileEntry {
+    entries := make([]fileEntry, 0, len(files))
+    for name, content := range files {
+        entries = append(entries, fileEntry{
+            Name:    name,
+            Content: content,
+        })
+    }
+    // 按文件名排序以确保顺序一致
+    sort.Slice(entries, func(i, j int) bool {
+        return entries[i].Name < entries[j].Name
+    })
+    return entries
+}
+
 func PackToText(files map[string]string) string {
-	// 将 map 转换为有序的切片
-	var entries []FileEntry
-	for name, content := range files {
-		entries = append(entries, FileEntry{Name: name, Content: content})
-	}
-
-	// 按文件名排序
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Name < entries[j].Name
-	})
-
-	var result strings.Builder
-	for _, entry := range entries {
-		result.WriteString(fmt.Sprintf("--- %s ---\n%s\n\n", entry.Name, entry.Content))
-	}
-	return result.String()
+    entries := sortFileEntries(files)
+    var result strings.Builder
+    for _, entry := range entries {
+        result.WriteString(fmt.Sprintf("--- %s ---\n%s\n\n", entry.Name, entry.Content))
+    }
+    return result.String()
 }
 
-// 修改 PackToMarkdown 函数
 func PackToMarkdown(files map[string]string) string {
-	// 将 map 转换为有序的切片
-	var entries []FileEntry
-	for name, content := range files {
-		entries = append(entries, FileEntry{Name: name, Content: content})
-	}
-
-	// 按文件名排序
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Name < entries[j].Name
-	})
-
-	var result strings.Builder
-	for _, entry := range entries {
-		ext := filepath.Ext(entry.Name)
-		lang := ""
-		if ext != "" {
-			lang = ext[1:] // 去掉点号
-		}
-		result.WriteString(fmt.Sprintf("## %s\n\n```%s\n%s\n```\n\n", entry.Name, lang, entry.Content))
-	}
-	return result.String()
+    entries := sortFileEntries(files)
+    var result strings.Builder
+    for _, entry := range entries {
+        ext := filepath.Ext(entry.Name)
+        lang := ""
+        if ext != "" {
+            lang = ext[1:] // 去掉点号
+        }
+        result.WriteString(fmt.Sprintf("## %s\n\n```%s\n%s\n```\n\n", entry.Name, lang, entry.Content))
+    }
+    return result.String()
 }
 
-// 修改 PackToXML 函数
 func PackToXML(files map[string]string) string {
-	// 将 map 转换为有序的切片
-	var entries []FileEntry
-	for name, content := range files {
-		entries = append(entries, FileEntry{Name: name, Content: content})
-	}
-
-	// 按文件名排序
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Name < entries[j].Name
-	})
-
-	var result strings.Builder
-	result.WriteString("<files>\n")
-	for _, entry := range entries {
-		result.WriteString(fmt.Sprintf("  <file name=\"%s\">\n    <![CDATA[\n%s\n    ]]>\n  </file>\n", entry.Name, entry.Content))
-	}
-	result.WriteString("</files>\n")
-	return result.String()
+    entries := sortFileEntries(files)
+    var result strings.Builder
+    result.WriteString("<files>\n")
+    for _, entry := range entries {
+        result.WriteString(fmt.Sprintf("  <file name=\"%s\">\n    <![CDATA[\n%s\n    ]]>\n  </file>\n", 
+            entry.Name, entry.Content))
+    }
+    result.WriteString("</files>\n")
+    return result.String()
 }

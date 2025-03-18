@@ -73,5 +73,11 @@
     "Failed to get git repository root: %s": "获取 Git 仓库根目录失败：%s",
     "File not found in target commit": "目标提交中未找到该文件",
     "File not found in current branch": "当前分支中未找到该文件",
-    "Failed to get commit list: %s": "获取提交列表失败：%s"
+    "Failed to get commit list: %s": "获取提交列表失败：%s",
+    "Operation canceled": "操作已取消",
+    "Request timeout, reason: %v": "请求超时，原因：%v",
+    "Request failed: %v": "请求失败：%v",
+    "Thinking": "思考中",
+    "Tips: Press Ctrl+Enter for new line, Enter to submit": "提示：按 Ctrl+Enter 换行，按 Enter 提交",
+    "Chat session terminated, thanks for using!": "会话已终止，感谢使用！"
 }
