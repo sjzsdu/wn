@@ -95,20 +95,39 @@ func runAI(cmd *cobra.Command, args []string) {
 				Role:    "user",
 				Content: cleanContent,
 			})
-			// 处理管道输入，但不退出
-			processChatRequest(ctx, provider, messages, model, maxTokens)
+			// 处理管道输入并等待响应
+			var response strings.Builder
+			responseCtx, responseCancel := context.WithTimeout(ctx, share.TIMEOUT)
+			defer responseCancel()
+
+			err := provider.CompleteStream(responseCtx, llm.CompletionRequest{
+				Model:     model,
+				Messages:  messages,
+				MaxTokens: maxTokens,
+			}, func(resp llm.StreamResponse) {
+				if !resp.Done {
+					fmt.Print(resp.Content)
+					response.WriteString(resp.Content)
+				}
+			})
+
+			if err == nil {
+				// 保存AI的回复到消息历史
+				messages = append(messages, llm.Message{
+					Role:    "assistant",
+					Content: response.String(),
+				})
+				fmt.Println()
+			}
 		}
-		
-		// 重新打开终端设备用于后续交互
-		tty, err := os.Open("/dev/tty")
-		if err != nil {
-			fmt.Printf(lang.T("Failed to open terminal: %v\n"), err)
+
+		// 重新设置标准输入为终端
+		if f, err := os.OpenFile("/dev/tty", os.O_RDONLY, 0); err == nil {
+			os.Stdin = f
+		} else {
+			fmt.Printf(lang.T("Failed to reopen terminal: %v\n"), err)
 			return
 		}
-		defer tty.Close()
-		
-		// 将标准输入重定向到终端
-		os.Stdin = tty
 	}
 
 	// 继续进入交互式聊天

@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/sjzsdu/wn/lang"
 )
 
 var (
@@ -69,4 +71,27 @@ func GetCommitsBetween(from, to string) ([]string, error) {
 		return nil, fmt.Errorf("没有找到需要重放的提交")
 	}
 	return commitList, nil
+}
+
+func ApplyCherryPicks(commits []string) bool {
+	// 过滤掉空的 commits
+	var validCommits []string
+	for _, commit := range commits {
+		if commit != "" {
+			validCommits = append(validCommits, commit)
+		}
+	}
+
+	if len(validCommits) == 0 {
+		return true
+	}
+
+	// 一次性 cherry-pick 所有 commits
+	args := append([]string{"cherry-pick"}, validCommits...)
+	if err := ExecGitCommand("git", args...); err != nil {
+		fmt.Printf(lang.T("Failed to cherry-pick commits, please fix it manually") + "\n")
+		ExecGitCommand("git", "cherry-pick", "--abort")
+		return false
+	}
+	return true
 }

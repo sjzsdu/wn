@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/sjzsdu/wn/helper"
@@ -21,35 +20,39 @@ func AppendCommit(commitHash string, modifiedFiles string) {
 	}
 
 	if modifiedFiles == "." {
-		appendCommitAll(commitHash)
+		appendCommit(commitHash, modifiedFiles)
 		return
 	}
 
-	appendCommitFiles(commitHash, strings.Split(modifiedFiles, ","))
+	appendCommit(commitHash, strings.Join(strings.Split(modifiedFiles, ","), " "))
 }
 
-func appendCommitAll(commitHash string) {
+func appendCommit(commitHash string, files string) {
+	allFiles := files == "."
+	tempBranch := fmt.Sprintf("temp-edit-%s", commitHash[:8])
+	tempStash := fmt.Sprintf("stash-edit-%s", commitHash[:8])
+	CreateStash(tempStash)
+
 	needCherryPicks, err := GetCommitsBetween(commitHash, "HEAD")
 	if err != nil {
 		fmt.Printf(lang.T("Failed to get commit list: %s")+"\n", err)
 		return
 	}
+	fmt.Printf(lang.T("Commit list: %s")+"\n", needCherryPicks)
 
-	hasStash := stashIfNeeded()
-	tempBranch := fmt.Sprintf("temp-edit-%s", commitHash[:8])
-
-	if err := ExecGitCommand("git", "checkout", "-b", tempBranch, commitHash); err != nil {
-		restoreStash(hasStash)
+	if err := ExecGitCommand("git", "checkout", commitHash); err != nil {
 		return
 	}
 
-	defer cleanup(tempBranch, hasStash)
-
-	if err := ExecGitCommand("git", "checkout", CurrentBranch, "--", "."); err != nil {
+	if err := ExecGitCommand("git", "checkout", "-b", tempBranch); err != nil {
 		return
 	}
 
-	if err := ExecGitCommand("git", "add", "."); err != nil {
+	defer cleanup(tempBranch)
+
+	ApplyStashByMessage(tempStash, true)
+
+	if err := ExecGitCommand("git", "add", files); err != nil {
 		return
 	}
 
@@ -57,87 +60,20 @@ func appendCommitAll(commitHash string) {
 		return
 	}
 
-	if !applyCherryPicks(needCherryPicks) {
+	if !allFiles {
+		CreateStash(tempStash)
+		defer ApplyStashByMessage(tempStash, true)
+	}
+
+	if !ApplyCherryPicks(needCherryPicks) {
 		return
 	}
 
 	finalizeBranch(tempBranch)
 }
 
-func appendCommitFiles(commitHash string, files []string) {
-	needCherryPicks, err := GetCommitsBetween(commitHash, "HEAD")
-	if err != nil {
-		fmt.Printf(lang.T("Failed to get commit list: %s")+"\n", err)
-		return
-	}
-
-	hasStash := stashIfNeeded()
-	tempBranch := fmt.Sprintf("temp-edit-%s", commitHash[:8])
-
-	if err := ExecGitCommand("git", "checkout", "-b", tempBranch, commitHash); err != nil {
-		restoreStash(hasStash)
-		return
-	}
-
-	defer cleanup(tempBranch, hasStash)
-
-	for _, file := range files {
-		file = strings.TrimSpace(file)
-		if file == "" {
-			continue
-		}
-		if err := ExecGitCommand("git", "checkout", CurrentBranch, "--", file); err != nil {
-			return
-		}
-		if err := ExecGitCommand("git", "add", file); err != nil {
-			return
-		}
-	}
-
-	if err := ExecGitCommand("git", "commit", "--amend", "--no-edit"); err != nil {
-		return
-	}
-
-	if !applyCherryPicks(needCherryPicks) {
-		return
-	}
-
-	finalizeBranch(tempBranch)
-}
-
-func stashIfNeeded() bool {
-	if output, err := exec.Command("git", "status", "--porcelain").Output(); err == nil && len(output) > 0 {
-		if err := ExecGitCommand("git", "stash", "push", "-u"); err == nil {
-			return true
-		}
-	}
-	return false
-}
-
-func cleanup(tempBranch string, hasStash bool) {
-	ExecGitCommand("git", "checkout", CurrentBranch)
+func cleanup(tempBranch string) {
 	ExecGitCommand("git", "branch", "-D", tempBranch)
-	restoreStash(hasStash)
-}
-
-func restoreStash(hasStash bool) {
-	if hasStash {
-		ExecGitCommand("git", "stash", "pop")
-	}
-}
-
-func applyCherryPicks(commits []string) bool {
-	for _, commit := range commits {
-		if commit == "" {
-			continue
-		}
-		if err := ExecGitCommand("git", "cherry-pick", commit); err != nil {
-			fmt.Printf(lang.T("Failed to cherry-pick commit %s, please fix it manually")+"\n", commit)
-			ExecGitCommand("git", "cherry-pick", "--abort")
-			return false
-		}
-	}
-	return true
 }
 
 func finalizeBranch(tempBranch string) {

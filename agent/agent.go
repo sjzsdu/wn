@@ -24,7 +24,7 @@ func GetAgentMessages(name string) []llm.Message {
 		Content: content,
 	})
 
-	if config.GetConfig("lang") != "" {
+	if config.GetConfig("lang") != "" && name != "translate" {
 		lang := config.GetConfig("lang")
 		messages = append(messages, llm.Message{
 			Role:    "system",
