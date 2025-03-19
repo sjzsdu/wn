@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/sjzsdu/wn/git"
 	"github.com/sjzsdu/wn/lang"
@@ -12,7 +13,6 @@ var gitCmd = &cobra.Command{
 	Use:   "git",
 	Short: lang.T("git command"),
 	Long:  lang.T("Extend the git command"),
-	Run:   runGit,
 }
 
 var (
@@ -21,29 +21,93 @@ var (
 	branchName    string
 )
 
-func init() {
-	rootCmd.AddCommand(gitCmd)
-	// 修复 StringVar 参数顺序：变量指针、参数名、短参数名、默认值、描述
-	gitCmd.Flags().StringVarP(&commitHash, "commit", "c", git.LatestCommit, lang.T("commit hash"))
-	gitCmd.Flags().StringVarP(&modifiedFiles, "files", "f", ".", lang.T("files to modify"))
-	gitCmd.Flags().StringVarP(&branchName, "branch", "b", "", lang.T("branch to rebase"))
+var commitCmd = &cobra.Command{
+	Use:   "commit",
+	Short: lang.T("Append changes to previous commit"),
+	Run: func(cmd *cobra.Command, args []string) {
+		if !git.IsGitRepo {
+			fmt.Println(lang.T("Current directory is not a git repository"))
+			return
+		}
+
+		targetCommit := commitHash // 默认使用 flag 中的值
+		if len(args) > 0 {
+			targetCommit = args[0] // 如果提供了位置参数，则使用位置参数
+		}
+		if targetCommit == "" {
+			fmt.Println(lang.T("Commit hash name is required"))
+			return
+		}
+		git.AppendCommit(commitHash, modifiedFiles)
+	},
 }
 
-// 避免初始化循环，将 runGit 定义为变量
-var runGit = func(cmd *cobra.Command, args []string) {
-	if !git.IsGitRepo {
-		fmt.Println(lang.T("Current directory is not a git repository"))
-		return
-	}
-	// 修改判断逻辑，两个参数都需要提供
-	if commitHash != "" && branchName != "" {
-		git.RebaseBranch(branchName, commitHash)
-		return
-	}
-	if commitHash != "" || modifiedFiles != "" {
-		// 如果只提供了其中一个参数，提示错误
-		git.AppendCommit(commitHash, modifiedFiles)
-		return
-	}
-	cmd.Help()
+var rebaseCmd = &cobra.Command{
+	Use:   "rebase [branch]",
+	Short: lang.T("Rebase current branch to target commit"),
+	Run: func(cmd *cobra.Command, args []string) {
+		if !git.IsGitRepo {
+			fmt.Println(lang.T("Current directory is not a git repository"))
+			return
+		}
+
+		targetBranch := branchName
+		targetCommit := commitHash
+
+		// 根据参数数量处理
+		switch len(args) {
+		case 2:
+			targetBranch = args[0]
+			targetCommit = args[1]
+		case 1:
+			targetCommit = args[0]
+		}
+
+		if targetBranch == "" {
+			fmt.Println(lang.T("Branch name is required"))
+			return
+		}
+
+		git.RebaseBranch(targetBranch, targetCommit)
+	},
+}
+
+var listCmd = &cobra.Command{
+	Use:   "list [from] [to]",
+	Short: lang.T("List commits between two commits"),
+	Run: func(cmd *cobra.Command, args []string) {
+		if !git.IsGitRepo {
+			fmt.Println(lang.T("Current directory is not a git repository"))
+			return
+		}
+
+		fromCommit := commitHash
+		toCommit := git.LatestCommit
+
+		// 根据参数数量处理
+		switch len(args) {
+		case 2:
+			fromCommit = args[0]
+			toCommit = args[1]
+		case 1:
+			fromCommit = args[0]
+		}
+
+		commits, err := git.GetCommitsBetween(fromCommit, toCommit)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		fmt.Println(strings.Join(commits, " "))
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(gitCmd)
+
+	// 添加子命令
+	gitCmd.AddCommand(commitCmd)
+	gitCmd.AddCommand(rebaseCmd)
+	gitCmd.AddCommand(listCmd) // 添加新的子命令
 }

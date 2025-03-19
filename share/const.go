@@ -3,7 +3,7 @@ package share
 import "time"
 
 // VERSION 版本号
-const VERSION = "0.2.9"
+const VERSION = "1.0.0"
 
 // BUILDNAME 制品名称
 const BUILDNAME = "wn"
