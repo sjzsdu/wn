@@ -26,6 +26,15 @@ plugins:
       lang: zh
   - minify:
       minify_html: true
+  - i18n:
+      default_language: zh
+      languages:
+        zh:
+          name: 中文
+          build: true
+        en:
+          name: English
+          build: true
 
 markdown_extensions:
   - pymdownx.highlight
@@ -46,6 +55,11 @@ nav:
     - Pack: wn_pack.md
     - Static: wn_static.md
     - Version: wn_version.md
+
+# GitHub Pages 相关配置
+repo_name: sjzsdu/wn
+repo_url: https://github.com/sjzsdu/wn
+edit_uri: edit/main/docs/
 
 # 错误处理
 strict: true
