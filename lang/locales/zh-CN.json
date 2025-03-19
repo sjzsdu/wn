@@ -41,7 +41,7 @@
     
     "Error initializing readline": "初始化读取行失败",
     "AI use agent name": "AI 使用的 agent 名称",
-    "Enter 'quit' or 'exit' to end the conversation": "输入 'quit' 或 'exit' 结束对话",
+    "Enter 'quit' or 'q' to end the conversation": "输入 'quit' 或 'q' 结束对话",
     "Invalid arguments": "无效的参数",
     "Wn command line tool": "Wn 命令行工具",
     "A versatile command line tool for development": "一个多功能的开发命令行工具",
@@ -78,6 +78,6 @@
     "Request timeout, reason: %v": "请求超时，原因：%v",
     "Request failed: %v": "请求失败：%v",
     "Thinking": "思考中",
-    "Tips: Press Ctrl+Enter for new line, Enter to submit": "提示：按 Ctrl+Enter 换行，按 Enter 提交",
+    "Tips: Press Ctrl+J for new line, Enter to submit": "提示：按 Ctrl+J 换行，按 Enter 提交",
     "Chat session terminated, thanks for using!": "会话已终止，感谢使用！"
 }

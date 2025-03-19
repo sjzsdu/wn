@@ -3,11 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
-	"github.com/chzyer/readline"
 	"github.com/sjzsdu/wn/agent"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
@@ -89,8 +87,8 @@ func (c *aiCommand) startChat(provider llm.Provider) {
 	defer cancel()
 
 	targetModel := provider.SetModel(c.model)
-	fmt.Println(lang.T("Start chatting with AI") + " (" + lang.T("Enter 'quit' or 'exit' to end the conversation") + ")")
-	fmt.Println(lang.T("Tips: Press Ctrl+Enter for new line, Enter to submit"))
+	fmt.Println(lang.T("Start chatting with AI") + " (" + lang.T("Enter 'quit' or 'q' to end the conversation") + ")")
+	fmt.Println(lang.T("Tips: Type 'vim' or press Ctrl+V to open vim for multi-line input"))
 	fmt.Println(lang.T("Using model")+":", targetModel)
 
 	isPipe := !terminal.IsTerminal(int(os.Stdin.Fd()))
@@ -129,7 +127,6 @@ func (c *aiCommand) listAvailableModels(provider llm.Provider) {
 }
 
 func (c *aiCommand) startInteractiveChat(ctx context.Context, provider llm.Provider) {
-	// 使用 msgManager 中的消息
 	messages := c.msgManager.GetAll()
 	if len(messages) > 0 {
 		c.processChatRequest(ctx, provider)
@@ -138,10 +135,6 @@ func (c *aiCommand) startInteractiveChat(ctx context.Context, provider llm.Provi
 	for {
 		input, err := helper.ReadFromTerminal("> ")
 		if err != nil {
-			if err == readline.ErrInterrupt || err == io.EOF {
-				fmt.Println("\n" + lang.T("Chat session terminated, thanks for using!"))
-				return
-			}
 			fmt.Printf(lang.T("Error reading input")+": %v\n", err)
 			continue
 		}
@@ -152,21 +145,28 @@ func (c *aiCommand) startInteractiveChat(ctx context.Context, provider llm.Provi
 		}
 
 		// 特殊命令处理
-		if input == "debug" {
+		switch input {
+		case "debug":
 			c.outputDebug()
 			return
-		}
-		if input == "quit" || input == "exit" || input == "q" {
+		case "quit", "q":
 			fmt.Println(lang.T("Chat session terminated, thanks for using!"))
 			return
+		}
+
+		if input == "vim" {
+			input, err = helper.ReadFromVim()
+			if err != nil {
+				fmt.Printf(lang.T("Error reading vim")+": %v\n", err)
+				continue
+			} else {
+				fmt.Printf(">%s\n", input)
+			}
 		}
 
 		if inDebug {
 			fmt.Println(input)
 		}
-
-		// 显示用户输入
-		fmt.Printf("> %s\n", input)
 
 		c.msgManager.Append(llm.Message{
 			Role:    "user",
