@@ -30,12 +30,17 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install -r requirements.txt
           pip install mkdocs mkdocs-material mkdocs-static-i18n mkdocs-minify-plugin
           
       - name: Generate Cobra docs
         run: |
           mkdir -p docs
+          pwd
+          ls -la
+          go mod tidy
           go run main.go doc
+          ls -la docs/
         
       - name: Check docs generation
         run: |
