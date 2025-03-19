@@ -27,34 +27,49 @@ plugins:
   - minify:
       minify_html: true
   - i18n:
-      default_language: zh
+      docs_structure: folder
       languages:
-        zh:
+        - locale: zh
+          default: true
           name: 中文
           build: true
-        en:
+        - locale: en
           name: English
           build: true
 
-markdown_extensions:
-  - pymdownx.highlight
-  - pymdownx.superfences
-  - admonition
-  - toc:
-      permalink: true
-
 nav:
-  - Home: index.md
-  - Commands:
-    - WN: wn.md
-    - Agent: wn_agent.md
-    - AI: wn_ai.md
-    - Config: wn_config.md
-    - Doc: wn_doc.md
-    - Git: wn_git.md
-    - Pack: wn_pack.md
-    - Static: wn_static.md
-    - Version: wn_version.md
+  - zh:
+    - 首页: index.md
+    - 命令:
+      - WN: wn.md
+      - Agent: wn_agent.md
+      - AI: wn_ai.md
+      - Config: wn_config.md
+      - Doc: wn_doc.md
+      - Git: 
+        - 概述: wn_git.md
+        - Commit: wn_git_commit.md
+        - List: wn_git_list.md
+        - Rebase: wn_git_rebase.md
+      - Pack: wn_pack.md
+      - Static: wn_static.md
+      - Version: wn_version.md
+  - en:
+    - Home: index.md
+    - Commands:
+      - WN: wn.md
+      - Agent: wn_agent.md
+      - AI: wn_ai.md
+      - Config: wn_config.md
+      - Doc: wn_doc.md
+      - Git: 
+        - Overview: wn_git.md
+        - Commit: wn_git_commit.md
+        - List: wn_git_list.md
+        - Rebase: wn_git_rebase.md
+      - Pack: wn_pack.md
+      - Static: wn_static.md
+      - Version: wn_version.md
 
 # GitHub Pages 相关配置
 repo_name: sjzsdu/wn

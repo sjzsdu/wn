@@ -15,26 +15,38 @@ var docCmd = &cobra.Command{
 	Long: lang.T(`Generate documentation for all commands.
 The documentation will be generated in Markdown format and saved in the docs directory.`),
 	Run: func(cmd *cobra.Command, args []string) {
-		// 确保目录存在
-		if err := os.MkdirAll("./docs", 0755); err != nil {
-			fmt.Printf("Failed to create docs directory: %v\n", err)
+		// 创建中文和英文文档目录
+		dirs := []string{"./docs/zh", "./docs/en"}
+		for _, dir := range dirs {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				fmt.Printf("Failed to create directory %s: %v\n", dir, err)
+				return
+			}
+		}
+
+		// 生成中文文档
+		indexZh := "# WN CLI 文档\n\n欢迎使用 WN CLI 工具。"
+		if err := os.WriteFile("./docs/zh/index.md", []byte(indexZh), 0644); err != nil {
+			fmt.Printf("Failed to create Chinese index.md: %v\n", err)
+			return
+		}
+		if err := doc.GenMarkdownTree(rootCmd, "./docs/zh"); err != nil {
+			fmt.Printf("Failed to generate Chinese documentation: %v\n", err)
 			return
 		}
 
-		// 生成默认的 index.md
-		indexContent := "# WN CLI Documentation\n\nWelcome to WN CLI documentation."
-		if err := os.WriteFile("./docs/index.md", []byte(indexContent), 0644); err != nil {
-			fmt.Printf("Failed to create index.md: %v\n", err)
+		// 生成英文文档
+		indexEn := "# WN CLI Documentation\n\nWelcome to WN CLI documentation."
+		if err := os.WriteFile("./docs/en/index.md", []byte(indexEn), 0644); err != nil {
+			fmt.Printf("Failed to create English index.md: %v\n", err)
+			return
+		}
+		if err := doc.GenMarkdownTree(rootCmd, "./docs/en"); err != nil {
+			fmt.Printf("Failed to generate English documentation: %v\n", err)
 			return
 		}
 
-		// 生成命令文档
-		err := doc.GenMarkdownTree(rootCmd, "./docs")
-		if err != nil {
-			fmt.Printf("Failed to generate documentation: %v\n", err)
-			return
-		}
-		fmt.Println("Documentation generated successfully in ./docs directory")
+		fmt.Println("Documentation generated successfully in ./docs/zh and ./docs/en directories")
 	},
 }
 

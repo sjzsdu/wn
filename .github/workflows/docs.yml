@@ -44,10 +44,15 @@ jobs:
         
       - name: Check docs generation
         run: |
-          if [ ! -f "docs/index.md" ]; then
+          if [ ! -f "docs/zh/index.md" ] || [ ! -f "docs/en/index.md" ]; then
             echo "Documentation generation failed"
             exit 1
           fi
+        
+      - name: Check docs structure
+        run: |
+            echo "Checking docs structure..."
+            ls -R docs/
         
       - name: Deploy docs
         run: |
