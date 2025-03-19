@@ -1,0 +1,51 @@
+site_name: WN CLI Documentation
+site_url: https://sjzsdu.github.io/wn/  # 添加站点 URL
+site_description: WN CLI tool documentation
+site_author: Trae
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search:
+      lang: zh
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - admonition
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Commands:
+    - WN: wn.md
+    - Agent: wn_agent.md
+    - AI: wn_ai.md
+    - Config: wn_config.md
+    - Doc: wn_doc.md
+    - Git: wn_git.md
+    - Pack: wn_pack.md
+    - Static: wn_static.md
+    - Version: wn_version.md
+
+# 错误处理
+strict: true
