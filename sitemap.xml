@@ -1,55 +1,185 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
     <url>
-         <loc>https://sjzsdu.github.io/wn/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_agent/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_agent/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_agent/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_agent/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_ai/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_ai/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_ai/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_ai/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_config/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_config/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_config/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_config/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_doc/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_doc/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_doc/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_doc/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_git/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_git/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_git/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_git/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_git_commit/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_git_commit/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_git_commit/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_git_commit/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_git_list/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_git_list/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_git_list/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_git_list/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_git_rebase/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_git_rebase/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_git_rebase/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_git_rebase/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_pack/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_pack/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_pack/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_pack/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_static/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_static/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_static/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_static/"/>
     </url>
     <url>
-         <loc>https://sjzsdu.github.io/wn/wn_version/</loc>
-         <lastmod>2025-03-19</lastmod>
+        <loc>https://sjzsdu.github.io/wn/wn_version/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_version/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_version/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_agent/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_agent/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_agent/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_ai/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_ai/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_ai/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_config/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_config/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_config/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_doc/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_doc/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_doc/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_git/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_git/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_git/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_git_commit/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_git_commit/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_git_commit/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_git_list/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_git_list/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_git_list/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_git_rebase/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_git_rebase/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_git_rebase/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_pack/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_pack/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_pack/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_static/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_static/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_static/"/>
+    </url>
+    <url>
+        <loc>https://sjzsdu.github.io/wn/en/wn_version/</loc>
+        <lastmod>2025-03-19</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://sjzsdu.github.io/wn/en/wn_version/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://sjzsdu.github.io/wn/wn_version/"/>
     </url>
 </urlset>
