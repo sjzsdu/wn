@@ -7,6 +7,9 @@ import (
 
 func FindFont() (string, error) {
 	fontPaths := []string{
+		"/System/Library/Fonts/Songti.ttc", // 常用中文字体
+		"/System/Library/Fonts/SimSun.ttf", // 常用中文字体
+		"/System/Library/Fonts/SimHei.ttf", // 常用中文字体
 		"/System/Library/Fonts/PingFang.ttc",
 		"/Library/Fonts/Arial Unicode.ttf",
 		"/System/Library/Fonts/STHeiti Light.ttc",

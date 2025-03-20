@@ -17,6 +17,15 @@ type tocItem struct {
 	level int
 }
 
+const (
+	pageWidth      = 190.0  // 页面宽度
+	lineHeight     = 5.0    // 每行高度
+	titleHeight    = 10.0   // 标题高度
+	pageHeight     = 297.0  // A4页面高度
+	marginTop      = 30.0   // 上边距
+	marginBottom   = 20.0   // 下边距
+)
+
 func (d *Project) ExportToPDF(outputPath string) error {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 
@@ -48,16 +57,13 @@ func (d *Project) ExportToPDF(outputPath string) error {
 		return pdf.OutputFileAndClose(outputPath)
 	}
 
-	// 添加目录页（第1页）
+	// 先添加一个空白目录页
 	pdf.AddPage()
-	pdf.SetFont(fontName, "", 16)
-	pdf.CellFormat(190, 10, "目录", "", 1, "C", false, 0, "")
-	pdf.SetFont(fontName, "", 12)
+	tocPage := pdf.PageNo() // 记录目录页页码
 
 	var tocItems []tocItem
-	currentPage := 1 // 从1开始，因为目录页是第1页
 
-	// 先生成内容页面
+	// 修改processNode函数，记录实际页码
 	var processNode func(node *Node, path string, level int) error
 	processNode = func(node *Node, path string, level int) error {
 		if node == nil {
@@ -69,14 +75,14 @@ func (d *Project) ExportToPDF(outputPath string) error {
 
 		if node.IsDir {
 			if path != "/" {
+				// 记录目录项，页码与后续文件页码一致
 				tocItems = append(tocItems, tocItem{
 					title: node.Name,
-					page:  currentPage + 1, // 目录项指向下一页
+					page:  pdf.PageNo() + 1, // 确保页码与后续文件页码一致
 					level: level,
 				})
 			}
 
-			// 处理子节点
 			for _, child := range node.Children {
 				childPath := filepath.Join(path, child.Name)
 				if err := processNode(child, childPath, level+1); err != nil {
@@ -84,24 +90,24 @@ func (d *Project) ExportToPDF(outputPath string) error {
 				}
 			}
 		} else {
-			// 为文件添加新页面
-			pdf.AddPage()
-			currentPage++
-
-			// 添加到目录
-			tocItems = append(tocItems, tocItem{
-				title: node.Name,
-				page:  currentPage,
-				level: level,
-			})
-
+			// 记录当前页码作为文件起始页
+			startPage := pdf.PageNo() + 1
+			
 			// 添加文件内容
+			pdf.AddPage()
 			pdf.SetFont(fontName, "", 14)
 			pdf.CellFormat(190, 10, node.Name, "", 1, "L", false, 0, "")
 
 			pdf.SetFont(fontName, "", 12)
 			content := string(node.Content)
 			pdf.MultiCell(190, 5, content, "", "L", false)
+
+			// 更新目录项
+			tocItems = append(tocItems, tocItem{
+				title: node.Name,
+				page:  startPage,
+				level: level,
+			})
 		}
 
 		return nil
@@ -113,18 +119,29 @@ func (d *Project) ExportToPDF(outputPath string) error {
 	}
 
 	// 返回到目录页填充内容
-	pdf.SetPage(1)
+	pdf.SetPage(tocPage)
 	pdf.SetY(30)
+	pdf.SetFont(fontName, "", 16)
+	pdf.CellFormat(190, 10, "目录", "", 1, "C", false, 0, "")
+	pdf.SetFont(fontName, "", 12)
 
 	// 添加目录项
 	for _, item := range tocItems {
-		indent := strings.Repeat("  ", item.level)
-		titleWidth := 150 - float64(item.level*10)
+		indent := strings.Repeat(" ", item.level) // 减少缩进空格数量
+		titleWidth := 150 - float64(item.level*5) // 调整标题宽度
 
-		// 添加目录项（不使用链接功能）
-		pdf.CellFormat(float64(item.level*10), 5, "", "", 0, "L", false, 0, "")
+		// 保存当前位置用于添加链接
+		x, y := pdf.GetXY()
+
+		// 添加目录项（使用链接功能）
+		pdf.CellFormat(float64(item.level*5), 5, "", "", 0, "L", false, 0, "")
 		pdf.CellFormat(titleWidth, 5, indent+item.title, "", 0, "L", false, 0, "")
 		pdf.CellFormat(40, 5, fmt.Sprintf("%d", item.page), "", 1, "R", false, 0, "")
+
+		// 使用AddLink和Link方法创建内部页面链接
+		link := pdf.AddLink()
+		pdf.SetLink(link, 0, item.page)
+		pdf.Link(x, y, 190, 5, link)
 	}
 
 	return pdf.OutputFileAndClose(outputPath)
