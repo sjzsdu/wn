@@ -7,64 +7,39 @@ import (
 	"strings"
 )
 
-// ExportToMarkdown 将项目导出为 Markdown 文件
-func (d *Project) ExportToMarkdown(outputPath string) error {
-	if d.root == nil || len(d.root.Children) == 0 {
-		// 如果是空项目，创建一个空的 markdown 文件
-		return os.WriteFile(outputPath, []byte("# 空项目\n"), 0644)
+type MarkdownExporter struct {
+	*BaseExporter
+	content strings.Builder
+}
+
+func NewMarkdownExporter(p *Project) *MarkdownExporter {
+	return &MarkdownExporter{
+		BaseExporter: NewBaseExporter(p),
+		content:     strings.Builder{},
 	}
+}
 
-	var content strings.Builder
-
-	// 写入标题和目录标记
-	content.WriteString("# 目录\n\n")
-
-	// 处理节点的函数
-	var processNode func(node *Node, path string, level int) error
-	processNode = func(node *Node, path string, level int) error {
-		if node == nil {
-			return nil
-		}
-
-		node.mu.RLock()
-		defer node.mu.RUnlock()
-
-		if node.IsDir {
-			if path != "/" {
-				// 为目录添加标题
-				indent := strings.Repeat("  ", level-1)
-				content.WriteString(fmt.Sprintf("%s- [%s](#%s)\n",
-					indent,
-					node.Name,
-					strings.ToLower(strings.ReplaceAll(node.Name, " ", "-"))))
-			}
-
-			for _, child := range node.Children {
-				childPath := filepath.Join(path, child.Name)
-				if err := processNode(child, childPath, level+1); err != nil {
-					return err
-				}
-			}
-		} else {
-			// 为文件添加目录项
-			indent := strings.Repeat("  ", level-1)
-			content.WriteString(fmt.Sprintf("%s- [%s](#%s)\n",
-				indent,
-				node.Name,
-				strings.ToLower(strings.ReplaceAll(node.Name, " ", "-"))))
-		}
-
-		return nil
+func (e *MarkdownExporter) ProcessDirectory(node *Node, path string, level int) error {
+	if path != "/" {
+		indent := strings.Repeat("  ", level-1)
+		anchor := strings.ToLower(strings.ReplaceAll(node.Name, " ", "-"))
+		e.content.WriteString(fmt.Sprintf("%s- [%s](#%s)\n",
+			indent, node.Name, anchor))
 	}
+	return nil
+}
 
-	// 处理目录树生成目录
-	if err := processNode(d.root, "/", 1); err != nil {
-		return err
-	}
+func (e *MarkdownExporter) ProcessFile(node *Node, path string, level int) error {
+	indent := strings.Repeat("  ", level-1)
+	anchor := strings.ToLower(strings.ReplaceAll(node.Name, " ", "-"))
+	e.content.WriteString(fmt.Sprintf("%s- [%s](#%s)\n",
+		indent, node.Name, anchor))
+	return nil
+}
 
-	content.WriteString("\n---\n\n") // 添加分隔线
+func (e *MarkdownExporter) writeContent() error {
+	e.content.WriteString("\n---\n\n")
 
-	// 第二次遍历，添加实际内容
 	var processContent func(node *Node, path string, level int) error
 	processContent = func(node *Node, path string, level int) error {
 		if node == nil {
@@ -76,8 +51,7 @@ func (d *Project) ExportToMarkdown(outputPath string) error {
 
 		if node.IsDir {
 			if path != "/" {
-				// 添加目录标题
-				content.WriteString(fmt.Sprintf("\n%s %s\n\n",
+				e.content.WriteString(fmt.Sprintf("\n%s %s\n\n",
 					strings.Repeat("#", level+1),
 					node.Name))
 			}
@@ -89,22 +63,42 @@ func (d *Project) ExportToMarkdown(outputPath string) error {
 				}
 			}
 		} else {
-			// 添加文件标题和内容
-			content.WriteString(fmt.Sprintf("\n%s %s\n\n",
+			e.content.WriteString(fmt.Sprintf("\n%s %s\n\n",
 				strings.Repeat("#", level+1),
 				node.Name))
-			content.WriteString(string(node.Content))
-			content.WriteString("\n")
+			e.content.WriteString(string(node.Content))
+			e.content.WriteString("\n")
 		}
 
 		return nil
 	}
 
-	// 处理内容
-	if err := processContent(d.root, "/", 1); err != nil {
+	return processContent(e.project.root, "/", 1)
+}
+
+func (e *MarkdownExporter) Export(outputPath string) error {
+	if e.project.root == nil || len(e.project.root.Children) == 0 {
+		return os.WriteFile(outputPath, []byte("# 空项目\n"), 0644)
+	}
+
+	// 写入标题和目录标记
+	e.content.WriteString("# 目录\n\n")
+
+	// 生成目录
+	if err := e.TraverseNodes(e.project.root, "/", 1, e); err != nil {
+		return err
+	}
+
+	// 写入内容
+	if err := e.writeContent(); err != nil {
 		return err
 	}
 
 	// 写入文件
-	return os.WriteFile(outputPath, []byte(content.String()), 0644)
+	return os.WriteFile(outputPath, []byte(e.content.String()), 0644)
+}
+
+func (d *Project) ExportToMarkdown(outputPath string) error {
+	exporter := NewMarkdownExporter(d)
+	return exporter.Export(outputPath)
 }

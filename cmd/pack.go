@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
@@ -46,28 +44,7 @@ func runPack(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	outputExt := strings.ToLower(filepath.Ext(output))
-
-	switch outputExt {
-	case ".pdf":
-		if err := doc.ExportToPDF(output); err != nil {
-			fmt.Printf("failed to export PDF: %v\n", err)
-			return
-		}
-	case ".md":
-		if err := doc.ExportToMarkdown(output); err != nil {
-			fmt.Printf("failed to export Markdown: %v\n", err)
-			return
-		}
-	case ".xml":
-		if err := doc.ExportToXML(output); err != nil {
-			fmt.Printf("failed to export xml: %v\n", err)
-			return
-		}
-	default:
-		fmt.Printf("Output file format only support pdf, md, xml")
-		return
-	}
+	err = doc.Export(output)
 
 	if err != nil {
 		fmt.Printf("Error packing files: %v\n", err)

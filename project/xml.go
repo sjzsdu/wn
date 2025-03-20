@@ -21,41 +21,45 @@ type XMLDocument struct {
 	Nodes   []XMLNode `xml:"nodes>node"`
 }
 
-// ExportToXML 将项目导出为 XML 文件
-func (d *Project) ExportToXML(outputPath string) error {
-	if d.root == nil {
+// XMLExporter XML导出器
+type XMLExporter struct {
+	*BaseExporter
+	doc XMLDocument
+}
+
+// NewXMLExporter 创建新的XML导出器
+func NewXMLExporter(p *Project) *XMLExporter {
+	return &XMLExporter{
+		BaseExporter: NewBaseExporter(p),
+		doc:         XMLDocument{},
+	}
+}
+
+func (x *XMLExporter) ProcessDirectory(node *Node, path string, level int) error {
+	xmlNode := XMLNode{
+		Name: node.Name,
+		Type: "directory",
+		Children: make([]XMLNode, 0, len(node.Children)),
+	}
+	x.doc.Nodes = append(x.doc.Nodes, xmlNode)
+	return nil
+}
+
+func (x *XMLExporter) ProcessFile(node *Node, path string, level int) error {
+	content := string(node.Content)
+	xmlNode := XMLNode{
+		Name:    node.Name,
+		Type:    "file",
+		Content: &content,
+	}
+	x.doc.Nodes = append(x.doc.Nodes, xmlNode)
+	return nil
+}
+
+func (x *XMLExporter) Export(outputPath string) error {
+	if x.project.root == nil {
 		return fmt.Errorf("project is empty")
 	}
-
-	doc := XMLDocument{}
-
-	// 转换节点的函数
-	var convertNode func(node *Node) XMLNode
-	convertNode = func(node *Node) XMLNode {
-		node.mu.RLock()
-		defer node.mu.RUnlock()
-
-		xmlNode := XMLNode{
-			Name: node.Name,
-		}
-
-		if node.IsDir {
-			xmlNode.Type = "directory"
-			xmlNode.Children = make([]XMLNode, 0, len(node.Children))
-			for _, child := range node.Children {
-				xmlNode.Children = append(xmlNode.Children, convertNode(child))
-			}
-		} else {
-			xmlNode.Type = "file"
-			content := string(node.Content)
-			xmlNode.Content = &content
-		}
-
-		return xmlNode
-	}
-
-	// 转换整个文档树
-	doc.Nodes = []XMLNode{convertNode(d.root)}
 
 	// 创建输出文件
 	file, err := os.Create(outputPath)
@@ -71,10 +75,21 @@ func (d *Project) ExportToXML(outputPath string) error {
 	encoder := xml.NewEncoder(file)
 	encoder.Indent("", "  ")
 
+	// 遍历节点并构建文档
+	if err := x.TraverseNodes(x.project.root, "/", 0, x); err != nil {
+		return err
+	}
+
 	// 编码并写入文件
-	if err := encoder.Encode(doc); err != nil {
+	if err := encoder.Encode(x.doc); err != nil {
 		return fmt.Errorf("failed to encode XML: %v", err)
 	}
 
 	return nil
+}
+
+// ExportToXML 将项目导出为 XML 文件
+func (d *Project) ExportToXML(outputPath string) error {
+	exporter := NewXMLExporter(d)
+	return exporter.Export(outputPath)
 }
