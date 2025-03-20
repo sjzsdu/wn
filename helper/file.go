@@ -50,13 +50,13 @@ func WalkDir(root string, callback WalkFunc, filter FilterFunc, options WalkDirO
 		// 处理 .gitignore 规则
 		if !options.DisableGitIgnore {
 			if info.IsDir() {
-				rules, err := readGitignore(path)
+				rules, err := ReadGitignore(path)
 				if err == nil && rules != nil {
 					gitignoreRules[path] = rules
 				}
 			}
 
-			excluded, excludeErr := isPathExcludedByGitignore(path, root, gitignoreRules)
+			excluded, excludeErr := IsPathExcludedByGitignore(path, root, gitignoreRules)
 			if excludeErr != nil {
 				return excludeErr
 			}
@@ -168,8 +168,8 @@ func isReadableTextFile(path string) bool {
 	return utf8.Valid(buffer)
 }
 
-// readGitignore 读取.gitignore文件并返回其中的规则
-func readGitignore(dir string) ([]string, error) {
+// ReadGitignore 读取.gitignore文件并返回其中的规则
+func ReadGitignore(dir string) ([]string, error) {
 	gitignorePath := filepath.Join(dir, ".gitignore")
 	file, err := os.Open(gitignorePath)
 	if err != nil {
@@ -206,7 +206,7 @@ func IsPathExcluded(path string, excludes []string, rootDir string) bool {
 	}
 
 	// 检查.gitignore规则
-	gitignoreRules, err := readGitignore(rootDir)
+	gitignoreRules, err := ReadGitignore(rootDir)
 	if err != nil {
 		// 如果读取.gitignore出错，我们就忽略它，继续处理
 		return false
@@ -238,7 +238,7 @@ func IsPathExcluded(path string, excludes []string, rootDir string) bool {
 	return false
 }
 
-func isPathExcludedByGitignore(path, rootDir string, gitignoreRules map[string][]string) (bool, error) {
+func IsPathExcludedByGitignore(path, rootDir string, gitignoreRules map[string][]string) (bool, error) {
 	relPath, err := filepath.Rel(rootDir, path)
 	if err != nil {
 		return false, err
