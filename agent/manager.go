@@ -194,10 +194,7 @@ func UpdateExistingAgent(name, content string) {
 
 // DeleteExistingAgent 删除现有代理
 func DeleteExistingAgent(name string) {
-	if _, exists := systemAgents[name]; exists {
-		fmt.Println(lang.T("Cannot delete system agent"))
-		return
-	}
+
 	if _, exists := userAgents[name]; !exists {
 		fmt.Println(lang.T("Agent not found"))
 		return

@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
+	"github.com/sjzsdu/wn/output/file"
 	"github.com/sjzsdu/wn/project"
 	"github.com/spf13/cobra"
 )
@@ -44,7 +46,31 @@ func runPack(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	err = doc.Export(output)
+	// 检查项目树是否为空
+	if doc.IsEmpty() {
+		fmt.Printf("No files to pack\n")
+		return
+	}
+
+	// 根据输出文件扩展名选择导出格式
+	switch filepath.Ext(output) {
+	case ".md":
+		exporter := file.NewMarkdownExporter(doc)
+		err = exporter.Export(output)
+	// case ".pdf":
+	// 	exporter, err := file.NewPDFExporter(doc)
+	// 	if err != nil {
+	// 		fmt.Printf("Error creating PDF exporter: %v\n", err)
+	// 		return
+	// 	}
+	// 	exporter.Export(output)
+	case ".xml":
+		exporter := file.NewXMLExporter(doc)
+		err = exporter.Export(output)
+	default:
+		fmt.Printf("Unsupported output format: %s\n", filepath.Ext(output))
+		return
+	}
 
 	if err != nil {
 		fmt.Printf("Error packing files: %v\n", err)

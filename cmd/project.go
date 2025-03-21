@@ -45,10 +45,7 @@ func runproject(cmd *cobra.Command, args []string) {
 	}
 
 	// 导出为 PDF 文件
-	if err := doc.ExportToPDF(output); err != nil {
-		fmt.Printf("failed to export PDF: %v\n", err)
-		return
-	}
+	fmt.Println(doc)
 
 	fmt.Printf("Successfully exported project to %s\n", output)
 }

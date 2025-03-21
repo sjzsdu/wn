@@ -193,3 +193,15 @@ func (d *Project) findNode(path string) (*Node, error) {
 
 	return current, nil
 }
+
+// IsEmpty 检查项目是否为空
+func (d *Project) IsEmpty() bool {
+	if d == nil || d.root == nil {
+		return true
+	}
+
+	d.root.mu.RLock()
+	defer d.root.mu.RUnlock()
+
+	return len(d.root.Children) == 0
+}
