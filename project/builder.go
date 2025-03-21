@@ -22,6 +22,7 @@ var excludedDirs = map[string]bool{
 	"dist":         true,
 	"build":        true,
 	"target":       true,
+	"fonts":        true,
 }
 
 // BuildProjectTree 构建项目目录树

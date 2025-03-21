@@ -6,6 +6,8 @@ type ContentCollector interface {
 	AddTitle(title string, level int) error
 	// AddContent 添加内容
 	AddContent(content string) error
+	// AddTOCItem 添加目录项
+	AddTOCItem(title string, level int) error
 	// Render 渲染最终结果
 	Render(outputPath string) error
 }
@@ -46,14 +48,29 @@ func (b *BaseExporter) Export(outputPath string) error {
 
 // VisitDirectory 实现通用的目录访问逻辑
 func (b *BaseExporter) VisitDirectory(node *Node, path string, level int) error {
-	if path != "/" {
-		return b.collector.AddTitle(node.Name, level)
+	if path == "/" {
+		return nil
 	}
-	return nil
+
+	// 尝试添加目录项（如果收集器支持的话）
+	if tocCollector, ok := b.collector.(interface{ AddTOCItem(string, int) error }); ok {
+		if err := tocCollector.AddTOCItem(node.Name, level); err != nil {
+			return err
+		}
+	}
+
+	return b.collector.AddTitle(node.Name, level)
 }
 
 // VisitFile 实现通用的文件访问逻辑
 func (b *BaseExporter) VisitFile(node *Node, path string, level int) error {
+	// 尝试添加目录项（如果收集器支持的话）
+	if tocCollector, ok := b.collector.(interface{ AddTOCItem(string, int) error }); ok {
+		if err := tocCollector.AddTOCItem(node.Name, level); err != nil {
+			return err
+		}
+	}
+
 	if err := b.collector.AddTitle(node.Name, level); err != nil {
 		return err
 	}

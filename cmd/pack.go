@@ -57,13 +57,13 @@ func runPack(cmd *cobra.Command, args []string) {
 	case ".md":
 		exporter := file.NewMarkdownExporter(doc)
 		err = exporter.Export(output)
-	// case ".pdf":
-	// 	exporter, err := file.NewPDFExporter(doc)
-	// 	if err != nil {
-	// 		fmt.Printf("Error creating PDF exporter: %v\n", err)
-	// 		return
-	// 	}
-	// 	exporter.Export(output)
+	case ".pdf":
+		exporter, err := file.NewPDFExporter(doc)
+		if err != nil {
+			fmt.Printf("Error creating PDF exporter: %v\n", err)
+			return
+		}
+		exporter.Export(output)
 	case ".xml":
 		exporter := file.NewXMLExporter(doc)
 		err = exporter.Export(output)
