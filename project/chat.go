@@ -55,11 +55,11 @@ func (v *ChatVisitor) VisitFile(node *Node, path string, level int) error {
 }
 
 func (v *ChatVisitor) calculateFileHash(node *Node) (string, error) {
-    if node.Content == nil {
-        return "", nil
-    }
-    hash := sha256.Sum256(node.Content)  // 直接使用 Content，不需要间接引用
-    return hex.EncodeToString(hash[:]), nil
+	if node.Content == nil {
+		return "", nil
+	}
+	hash := sha256.Sum256(node.Content) // 直接使用 Content，不需要间接引用
+	return hex.EncodeToString(hash[:]), nil
 }
 
 func (v *ChatVisitor) calculateDirHash(node *Node) (string, error) {
@@ -155,13 +155,3 @@ func (v *ChatVisitor) getHashForPath(path string) string {
 	}
 	return ""
 }
-
-// 删除这个未使用的函数，它属于错误的类型
-// func (v *ChatNodeVisitor) calculateFileHash(path string) string {
-//     content, err := os.ReadFile(path)
-//     if err != nil {
-//         return ""
-//     }
-//     hash := sha256.Sum256(content)
-//     return hex.EncodeToString(hash[:])
-// }

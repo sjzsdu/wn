@@ -14,11 +14,11 @@ func NewMockStorage() *MockStorage {
 	}
 }
 
-func (m *MockStorage) Init(projectRoot string) error                    { return nil }
-func (m *MockStorage) Close() error                                     { return nil }
-func (m *MockStorage) Save(record *CacheRecord) error                   { m.records[record.Path] = record; return nil }
-func (m *MockStorage) Remove(path string) error                         { delete(m.records, path); return nil }
-func (m *MockStorage) GetAll() ([]*CacheRecord, error)                 { return nil, nil }
+func (m *MockStorage) Init() error                     { return nil }
+func (m *MockStorage) Close() error                    { return nil }
+func (m *MockStorage) Save(record *CacheRecord) error  { m.records[record.Path] = record; return nil }
+func (m *MockStorage) Remove(path string) error        { delete(m.records, path); return nil }
+func (m *MockStorage) GetAll() ([]*CacheRecord, error) { return nil, nil }
 func (m *MockStorage) Find(path, hash string) (string, bool, error) {
 	if record, exists := m.records[path]; exists && record.Hash == hash {
 		return record.Content, true, nil
@@ -28,17 +28,14 @@ func (m *MockStorage) Find(path, hash string) (string, bool, error) {
 
 func TestCacheManager(t *testing.T) {
 	mockStorage := NewMockStorage()
-	manager, err := NewCacheManager("/test/project", mockStorage)
+	manager, err := NewCacheManager(mockStorage) // 移除了 projectRoot 参数
 	if err != nil {
 		t.Fatalf("Failed to create CacheManager: %v", err)
 	}
 
 	t.Run("SetRecord and FindContent", func(t *testing.T) {
-		err := manager.SetRecord("/test/file.go", "hash123", "content123")
-		if err != nil {
-			t.Errorf("SetRecord failed: %v", err)
-		}
-
+		// 使用链式调用
+		manager.SetRecord("/test/file.go", "hash123", "content123")
 		content, found, err := manager.FindContent("/test/file.go", "hash123")
 		if err != nil {
 			t.Errorf("FindContent failed: %v", err)

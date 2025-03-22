@@ -23,13 +23,13 @@ func NewJSONStorage() *JSONStorage {
 	}
 }
 
-func (s *JSONStorage) Init(projectRoot string) error {
-	projectName := filepath.Base(projectRoot)
-	s.cacheDir = helper.GetPath(projectName + "/" + JSON_FILE)
-	if err := os.MkdirAll(s.cacheDir, 0755); err != nil {
-		return err
-	}
-	return s.load()
+func (s *JSONStorage) Init() error {
+    cacheDir := helper.GetPath("cache")
+    if err := os.MkdirAll(cacheDir, 0755); err != nil {
+        return err
+    }
+    s.cacheDir = cacheDir
+    return s.load()
 }
 
 func (s *JSONStorage) Find(path, hash string) (string, bool, error) {

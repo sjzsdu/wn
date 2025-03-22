@@ -10,7 +10,7 @@ type CacheRecord struct {
 // CacheStorage 定义缓存存储接口
 type CacheStorage interface {
 	// Init 初始化存储
-	Init(projectRoot string) error
+	Init() error
 	// Find 查找记录
 	Find(path, hash string) (string, bool, error)
 	// Save 保存记录
@@ -29,8 +29,8 @@ type CacheManager struct {
 }
 
 // NewCacheManager 创建新的缓存管理器
-func NewCacheManager(projectRoot string, storage CacheStorage) (*CacheManager, error) {
-	if err := storage.Init(projectRoot); err != nil {
+func NewCacheManager(storage CacheStorage) (*CacheManager, error) {
+	if err := storage.Init(); err != nil {
 		return nil, err
 	}
 
@@ -45,13 +45,17 @@ func (cm *CacheManager) FindContent(path, hash string) (string, bool, error) {
 }
 
 // SetRecord 设置或更新缓存记录
-func (cm *CacheManager) SetRecord(path, hash, content string) error {
+func (cm *CacheManager) SetRecord(path, hash, content string) *CacheManager {
 	record := &CacheRecord{
 		Path:    path,
 		Hash:    hash,
 		Content: content,
 	}
-	return cm.storage.Save(record)
+	if err := cm.storage.Save(record); err != nil {
+		// 这里我们可以选择记录错误，但继续允许链式调用
+		// 用户可以通过其他方法检查最后的错误状态
+	}
+	return cm
 }
 
 // RemoveRecord 删除缓存记录

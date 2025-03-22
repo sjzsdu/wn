@@ -5,16 +5,14 @@ import (
 )
 
 func TestSQLiteStorage(t *testing.T) {
-	// 创建临时测试目录
-	tmpDir := t.TempDir()
-	storage := NewSQLiteStorage()
+    storage := NewSQLiteStorage()
 
-	t.Run("Init", func(t *testing.T) {
-		err := storage.Init(tmpDir)
-		if err != nil {
-			t.Errorf("Init failed: %v", err)
-		}
-	})
+    t.Run("Init", func(t *testing.T) {
+        err := storage.Init()  // 移除了 tmpDir 参数
+        if err != nil {
+            t.Errorf("Init failed: %v", err)
+        }
+    })
 
 	t.Run("Save and Find", func(t *testing.T) {
 		record := &CacheRecord{
