@@ -1,0 +1,148 @@
+# {{ .Command.Name }} 命令
+
+{{ .Command.Short }}
+
+## 功能概述
+
+{{ .DetailedDesc }}
+
+## 主要特性
+
+- 多模型支持
+  - OpenAI (GPT-3.5/GPT-4)
+  - DeepSeek
+  - 更多模型持续集成中...
+- 流式输出
+  - 实时显示 AI 响应
+  - 支持打字机效果
+- 智能上下文
+  - 自动维护对话历史
+  - 支持多轮对话
+- Agent 系统
+  - 内置多个专业 Agent
+  - 支持自定义 Agent
+  - 场景化对话能力
+
+## 使用方法
+
+```bash
+{{ .Command.UseLine }}
+```
+
+## 命令参数
+
+| 参数 | 说明 | 默认值 | 示例 |
+|------|------|--------|-------|
+| --model | 指定使用的 AI 模型 | gpt-3.5-turbo | --model=gpt-4 |
+| --agent | 指定使用的 Agent | default | --agent=git-diff |
+| --context | 是否启用上下文记忆 | true | --context=false |
+| --stream | 是否启用流式输出 | true | --stream=false |
+
+## 使用场景
+
+### 1. 代码开发助手
+
+```bash
+# 获取代码审查建议
+wn ai "请帮我审查这段代码的安全性" --agent=code-review
+
+# 获取重构建议
+wn ai "如何优化这个函数的性能" --agent=refactor
+```
+
+### 2. Git 操作助手
+
+```bash
+# 分析 Git 差异
+wn ai "解释一下这些代码变更的影响" --agent=git-diff
+
+# 生成提交信息
+wn ai "帮我生成一个规范的提交信息" --agent=git
+```
+
+### 3. 技术文档翻译
+
+```bash
+# 翻译技术文档
+wn ai "请将这段文档翻译成中文，保持专业术语准确" --agent=translate
+```
+
+## 环境配置
+
+### API 密钥配置
+
+在使用前需要配置相应的 API 密钥：
+
+1. OpenAI API 密钥
+```bash
+export OPENAI_API_KEY="your-api-key"
+```
+
+2. DeepSeek API 密钥
+```bash
+export DEEPSEEK_API_KEY="your-api-key"
+```
+
+### 代理设置（可选）
+
+如果需要使用代理，可以配置：
+
+```bash
+export HTTP_PROXY="http://127.0.0.1:7890"
+export HTTPS_PROXY="http://127.0.0.1:7890"
+```
+
+## 高级功能
+
+### 自定义 Agent
+
+你可以创建自己的专业 Agent 来处理特定场景：
+
+1. 在 `agent/agents/` 目录下创建新的 markdown 文件
+2. 定义 Agent 的角色、任务和专业知识
+3. 使用 `--agent` 参数指定新创建的 Agent
+
+### 上下文管理
+
+- 使用 `--context=false` 可以开启无上下文模式
+- 长对话中可以使用 "清除上下文" 指令重置对话
+- 支持引用历史消息进行回复
+
+## 常见问题
+
+### Q1: 如何切换不同的模型？
+A1: 使用 `--model` 参数指定想要使用的模型，例如：`--model=gpt-4` 或 `--model=deepseek-chat`
+
+### Q2: 为什么响应较慢？
+A2: 可能的原因：
+- 网络连接问题
+- API 限流
+- 模型处理时间
+
+建议：
+- 检查网络连接
+- 配置合适的代理
+- 选择响应更快的模型
+
+### Q3: 如何处理 API 密钥过期？
+A3: 更新环境变量中的 API 密钥：
+```bash
+export OPENAI_API_KEY="your-new-api-key"
+```
+
+## 最佳实践
+
+1. 选择合适的 Agent
+   - 代码相关问题使用专业的代码 Agent
+   - 翻译任务使用翻译 Agent
+   - 架构设计使用架构 Agent
+
+2. 有效利用上下文
+   - 相关问题保持在同一会话中
+   - 及时清理不相关的上下文
+   - 适时使用无上下文模式
+
+3. 优化输出效果
+   - 使用清晰具体的提问
+   - 适当使用代码块和示例
+   - 根据需求选择合适的模型

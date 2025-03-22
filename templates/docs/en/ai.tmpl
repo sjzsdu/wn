@@ -1,0 +1,148 @@
+# {{ .Command.Name }} Command
+
+{{ .Command.Short }}
+
+## Overview
+
+{{ .DetailedDesc }}
+
+## Key Features
+
+- Multi-Model Support
+  - OpenAI (GPT-3.5/GPT-4)
+  - DeepSeek
+  - More models being integrated...
+- Streaming Output
+  - Real-time AI response display
+  - Typewriter effect support
+- Intelligent Context
+  - Automatic conversation history management
+  - Multi-turn dialogue support
+- Agent System
+  - Built-in professional agents
+  - Custom agent support
+  - Scenario-based conversation capabilities
+
+## Usage
+
+```bash
+{{ .Command.UseLine }}
+```
+
+## Command Parameters
+
+| Parameter | Description | Default Value | Example |
+|-----------|-------------|---------------|----------|
+| --model | Specify the AI model to use | gpt-3.5-turbo | --model=gpt-4 |
+| --agent | Specify the agent to use | default | --agent=git-diff |
+| --context | Enable context memory | true | --context=false |
+| --stream | Enable streaming output | true | --stream=false |
+
+## Use Cases
+
+### 1. Code Development Assistant
+
+```bash
+# Get code review suggestions
+wn ai "Please review the security of this code" --agent=code-review
+
+# Get refactoring suggestions
+wn ai "How can I improve this function's performance" --agent=refactor
+```
+
+### 2. Git Operation Assistant
+
+```bash
+# Analyze Git differences
+wn ai "Explain the impact of these code changes" --agent=git-diff
+
+# Generate commit message
+wn ai "Help me generate a standardized commit message" --agent=git
+```
+
+### 3. Technical Documentation Translation
+
+```bash
+# Translate technical documentation
+wn ai "Please translate this documentation to English, maintaining accurate technical terms" --agent=translate
+```
+
+## Environment Configuration
+
+### API Key Configuration
+
+API keys need to be configured before use:
+
+1. OpenAI API Key
+```bash
+export OPENAI_API_KEY="your-api-key"
+```
+
+2. DeepSeek API Key
+```bash
+export DEEPSEEK_API_KEY="your-api-key"
+```
+
+### Proxy Settings (Optional)
+
+If you need to use a proxy, you can configure:
+
+```bash
+export HTTP_PROXY="http://127.0.0.1:7890"
+export HTTPS_PROXY="http://127.0.0.1:7890"
+```
+
+## Advanced Features
+
+### Custom Agents
+
+You can create your own specialized agents for specific scenarios:
+
+1. Create a new markdown file in the `agent/agents/` directory
+2. Define the agent's role, tasks, and expertise
+3. Use the `--agent` parameter to specify the newly created agent
+
+### Context Management
+
+- Use `--context=false` to enable context-free mode
+- Use the "clear context" command to reset conversation in long dialogues
+- Support referencing historical messages in replies
+
+## Common Issues
+
+### Q1: How to switch between different models?
+A1: Use the `--model` parameter to specify the desired model, for example: `--model=gpt-4` or `--model=deepseek-chat`
+
+### Q2: Why is the response slow?
+A2: Possible reasons:
+- Network connection issues
+- API rate limiting
+- Model processing time
+
+Suggestions:
+- Check network connection
+- Configure appropriate proxy
+- Choose faster responding models
+
+### Q3: How to handle API key expiration?
+A3: Update the API key in environment variables:
+```bash
+export OPENAI_API_KEY="your-new-api-key"
+```
+
+## Best Practices
+
+1. Choose Appropriate Agents
+   - Use specialized code agents for code-related questions
+   - Use translation agents for translation tasks
+   - Use architecture agents for design tasks
+
+2. Effectively Use Context
+   - Keep related questions in the same session
+   - Clear irrelevant context timely
+   - Use context-free mode when appropriate
+
+3. Optimize Output Results
+   - Use clear and specific questions
+   - Properly use code blocks and examples
+   - Choose suitable models based on requirements

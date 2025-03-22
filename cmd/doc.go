@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/sjzsdu/wn/lang"
 	"github.com/spf13/cobra"
@@ -33,17 +37,22 @@ The documentation will be generated in Markdown format and saved in the docs dir
 		os.Setenv("WN_LANG", "zh")
 		lang.SetupI18n("")
 
-		// 创建中文版本的根命令副本
 		zhRootCmd := *rootCmd
-		// 更新所有命令的本地化文本
 		updateCommandsLocalization(&zhRootCmd)
 
-		indexZh := "# WN CLI 文档\n\n欢迎使用 WN CLI 工具。"
-		if err := os.WriteFile("./docs/zh/index.md", []byte(indexZh), 0644); err != nil {
+		// 复制 README.md 作为中文文档索引
+		readmeContent, err := os.ReadFile("README.md")
+		if err != nil {
+			fmt.Printf("Failed to read README.md: %v\n", err)
+			return
+		}
+		if err := os.WriteFile("./docs/zh/index.md", readmeContent, 0644); err != nil {
 			fmt.Printf("Failed to create Chinese index.md: %v\n", err)
 			return
 		}
-		if err := doc.GenMarkdownTree(&zhRootCmd, "./docs/zh"); err != nil {
+
+		// 遍历所有命令生成中文文档
+		if err := generateDocsForCommand(&zhRootCmd, "zh"); err != nil {
 			fmt.Printf("Failed to generate Chinese documentation: %v\n", err)
 			return
 		}
@@ -51,18 +60,50 @@ The documentation will be generated in Markdown format and saved in the docs dir
 		// 生成英文文档
 		os.Setenv("WN_LANG", "en")
 		lang.SetupI18n("")
+
+		// 复制 README.en.md 作为英文文档索引
+		readmeEnContent, err := os.ReadFile("README.en.md")
+		if err != nil {
+			fmt.Printf("Failed to read README.en.md: %v\n", err)
+			return
+		}
+		if err := os.WriteFile("./docs/en/index.md", readmeEnContent, 0644); err != nil {
+			fmt.Printf("Failed to create English index.md: %v\n", err)
+			return
+		}
+
+		// 生成英文索引
 		indexEn := "# WN CLI Documentation\n\nWelcome to WN CLI documentation."
 		if err := os.WriteFile("./docs/en/index.md", []byte(indexEn), 0644); err != nil {
 			fmt.Printf("Failed to create English index.md: %v\n", err)
 			return
 		}
-		if err := doc.GenMarkdownTree(rootCmd, "./docs/en"); err != nil {
+
+		// 遍历所有命令生成英文文档
+		if err := generateDocsForCommand(rootCmd, "en"); err != nil {
 			fmt.Printf("Failed to generate English documentation: %v\n", err)
 			return
 		}
 
 		fmt.Println("Documentation generated successfully in ./docs/zh and ./docs/en directories")
 	},
+}
+
+// 添加新的辅助函数用于递归生成文档
+func generateDocsForCommand(cmd *cobra.Command, langCode string) error {
+	// 先处理当前命令
+	if err := generateDocWithTemplate(cmd, langCode); err != nil {
+		return fmt.Errorf("error generating doc for command %s: %v", cmd.Name(), err)
+	}
+
+	// 递归处理所有子命令
+	for _, subCmd := range cmd.Commands() {
+		if err := generateDocsForCommand(subCmd, langCode); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // 更新命令及其子命令的本地化文本
@@ -93,4 +134,60 @@ func updateCommandsLocalization(cmd *cobra.Command) {
 
 func init() {
 	rootCmd.AddCommand(docCmd)
+}
+
+// 添加辅助函数
+func getCommandExamples(cmd *cobra.Command) []string {
+	if cmd.Example == "" {
+		return nil
+	}
+	return strings.Split(cmd.Example, "\n")
+}
+
+func getDetailedDescription(cmd *cobra.Command) string {
+	if cmd.Long != "" {
+		return cmd.Long
+	}
+	return cmd.Short
+}
+
+// 修改模板处理函数
+func generateDocWithTemplate(cmd *cobra.Command, langCode string) error {
+	// 获取模板文件
+	templatePath := filepath.Join("templates", "docs", langCode, cmd.Name()+".tmpl")
+	if _, err := os.Stat(templatePath); err == nil {
+		// 如果存在模板，使用模板生成
+		tmpl, err := template.ParseFiles(templatePath)
+		if err != nil {
+			return err
+		}
+
+		data := struct {
+			Command       *cobra.Command
+			UsageExamples []string
+			DetailedDesc  string
+		}{
+			Command:       cmd,
+			UsageExamples: getCommandExamples(cmd),
+			DetailedDesc:  getDetailedDescription(cmd),
+		}
+
+		var buf bytes.Buffer
+		if err := tmpl.Execute(&buf, data); err != nil {
+			return err
+		}
+
+		// 写入生成的文档
+		outputPath := filepath.Join("docs", langCode, cmd.Name()+".md")
+		return os.WriteFile(outputPath, buf.Bytes(), 0644)
+	}
+
+	// 如果没有模板，使用默认的 cobra 文档生成
+	outputPath := filepath.Join("docs", langCode, cmd.Name()+".md")
+	f, err := os.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return doc.GenMarkdown(cmd, f)
 }
