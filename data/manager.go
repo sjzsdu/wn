@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/sjzsdu/wn/config"
+	"github.com/sjzsdu/wn/share"
 )
 
 type StorageType string
@@ -19,7 +20,7 @@ func init() {
 	// 从配置中获取存储类型，默认使用 JSON
 	storageType := StorageType(config.GetConfig("storage_type"))
 	if storageType == "" {
-		storageType = JSONStorageType
+		storageType = share.CACHE_TYPE
 	}
 
 	manager, err := NewCacheManagerWithType(storageType)

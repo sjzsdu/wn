@@ -328,3 +328,8 @@ func CheckFilesExist(files string) error {
 	}
 	return nil
 }
+
+func GetFileExt(file string) string {
+	ext := filepath.Ext(file)
+	return ext[1:]
+}

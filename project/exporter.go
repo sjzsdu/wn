@@ -39,10 +39,7 @@ func (b *BaseExporter) Export(outputPath string) error {
 	}
 
 	traverser := NewTreeTraverser(b.project)
-	if err := traverser.Traverse(b.project.root, "/", 0, b); err != nil {
-		return err
-	}
-
+	traverser.SetTraverseOrder(PreOrder).TraverseTree(b)
 	return b.collector.Render(outputPath)
 }
 

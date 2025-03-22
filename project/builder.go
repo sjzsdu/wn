@@ -25,7 +25,7 @@ var excludedDirs = map[string]bool{
 	"fonts":        true,
 }
 
-// BuildProjectTree 构建项目目录树
+// BuildProjectTree 构建项目树
 func BuildProjectTree(targetPath string, options helper.WalkDirOptions) (*Project, error) {
 	doc := NewProject()
 	gitignoreRules := make(map[string][]string)
@@ -38,7 +38,12 @@ func BuildProjectTree(targetPath string, options helper.WalkDirOptions) (*Projec
 
 		// 检查是否是需要排除的目录
 		if info.IsDir() {
-			if excludedDirs[info.Name()] {
+			name := info.Name()
+			// 排除 . 和 .. 目录
+			if name == "." || name == ".." {
+				return nil
+			}
+			if excludedDirs[name] {
 				return filepath.SkipDir
 			}
 

@@ -21,10 +21,6 @@ func init() {
 }
 
 func runproject(cmd *cobra.Command, args []string) {
-	if output == "" {
-		fmt.Printf("Output is required")
-		return
-	}
 	targetPath, err := helper.GetTargetPath(cmdPath, gitURL)
 	if err != nil {
 		fmt.Printf("failed to get target path: %v\n", err)
@@ -44,8 +40,8 @@ func runproject(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// 导出为 PDF 文件
-	fmt.Println(doc)
+	traverser := project.NewBaseChatter(doc)
+	traverser.ChatWithLLM()
 
 	fmt.Printf("Successfully exported project to %s\n", output)
 }
