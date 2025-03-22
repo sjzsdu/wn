@@ -42,34 +42,34 @@ nav:
     - 首页: index.md
     - 命令:
       - WN: wn.md
-      - Agent: wn_agent.md
-      - AI: wn_ai.md
-      - Config: wn_config.md
-      - Doc: wn_doc.md
+      - Agent: agent.md
+      - AI: ai.md
+      - Config: config.md
+      - Doc: doc.md
       - Git: 
-        - 概述: wn_git.md
-        - Commit: wn_git_commit.md
-        - List: wn_git_list.md
-        - Rebase: wn_git_rebase.md
-      - Pack: wn_pack.md
-      - Static: wn_static.md
-      - Version: wn_version.md
+        - 概述: git.md
+        - Commit: commit.md
+        - List: list.md
+        - Rebase: rebase.md
+      - Pack: pack.md
+      - Static: static.md
+      - Version: version.md
   - en:
     - Home: index.md
     - Commands:
       - WN: wn.md
-      - Agent: wn_agent.md
-      - AI: wn_ai.md
-      - Config: wn_config.md
-      - Doc: wn_doc.md
+      - Agent: agent.md
+      - AI: ai.md
+      - Config: config.md
+      - Doc: doc.md
       - Git: 
-        - Overview: wn_git.md
-        - Commit: wn_git_commit.md
-        - List: wn_git_list.md
-        - Rebase: wn_git_rebase.md
-      - Pack: wn_pack.md
-      - Static: wn_static.md
-      - Version: wn_version.md
+        - Overview: git.md
+        - Commit: commit.md
+        - List: list.md
+        - Rebase: rebase.md
+      - Pack: pack.md
+      - Static: static.md
+      - Version: version.md
 
 # GitHub Pages 相关配置
 repo_name: sjzsdu/wn
