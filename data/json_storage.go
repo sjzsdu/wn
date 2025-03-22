@@ -5,7 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/sjzsdu/wn/helper"
 )
+
+const JSON_FILE = "ai_response.json"
 
 type JSONStorage struct {
 	cacheDir string
@@ -20,17 +24,11 @@ func NewJSONStorage() *JSONStorage {
 }
 
 func (s *JSONStorage) Init(projectRoot string) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
 	projectName := filepath.Base(projectRoot)
-	s.cacheDir = filepath.Join(homeDir, ".wn", projectName)
+	s.cacheDir = helper.GetPath(projectName + "/" + JSON_FILE)
 	if err := os.MkdirAll(s.cacheDir, 0755); err != nil {
 		return err
 	}
-
 	return s.load()
 }
 
