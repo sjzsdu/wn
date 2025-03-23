@@ -83,6 +83,9 @@ func BuildProjectTree(targetPath string, options helper.WalkDirOptions) (*Projec
 		}
 
 		if info.IsDir() {
+			if info.Name() == "." {
+				return nil
+			}
 			// 创建目录节点
 			return doc.CreateDir(relPath, info)
 		}

@@ -53,14 +53,14 @@ func (b *BaseChatter) VisitDirectory(node *Node, path string, level int) error {
 
 	// 缓存未命中，调用 LLM
 	messages := PrepareDirectoryMessage(path)
-	
+
 	childrenResponses, err := node.GetChildrenResponses()
 	if err != nil {
 		// 如果是空内容错误，设置特殊响应并返回
 		node.SetLLMResponse(fmt.Sprintf("目录分析跳过: %v", err))
 		return nil
 	}
-	
+
 	messages = append(messages, llm.Message{
 		Role:    "user",
 		Content: "请分析这个目录结构：" + childrenResponses,
@@ -123,6 +123,33 @@ func (b *BaseChatter) VisitFile(node *Node, path string, level int) error {
 }
 
 func (b *BaseChatter) ChatWithLLM() error {
+	totalNodes := b.project.GetTotalNodes()
+	progress := helper.NewProgress("处理项目文件", totalNodes)
+
+	// 创建一个包装访问器来更新进度
+	visitor := &progressVisitor{
+		BaseChatter: b,
+		progress:    progress,
+	}
+
 	traverser := NewTreeTraverser(b.project)
-	return traverser.SetTraverseOrder(PostOrder).TraverseTree(b)
+	return traverser.SetTraverseOrder(PostOrder).TraverseTree(visitor)
+}
+
+// progressVisitor 包装了 BaseChatter，添加了进度更新功能
+type progressVisitor struct {
+	*BaseChatter
+	progress *helper.Progress
+}
+
+func (p *progressVisitor) VisitDirectory(node *Node, path string, level int) error {
+	err := p.BaseChatter.VisitDirectory(node, path, level)
+	p.progress.Increment()
+	return err
+}
+
+func (p *progressVisitor) VisitFile(node *Node, path string, level int) error {
+	err := p.BaseChatter.VisitFile(node, path, level)
+	p.progress.Increment()
+	return err
 }

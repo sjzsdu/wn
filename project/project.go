@@ -212,3 +212,28 @@ func (d *Project) IsEmpty() bool {
 func (p *Project) GetAbsolutePath(path string) string {
 	return filepath.Join(p.rootPath, path)
 }
+
+// GetTotalNodes 计算项目中的总节点数（文件+目录）
+func (p *Project) GetTotalNodes() int {
+	if p.root == nil {
+		return 0
+	}
+	return countNodes(p.root)
+}
+
+func countNodes(node *Node) int {
+	if node == nil || node.Name == "." {
+		return 0
+	}
+
+	// 检查是否是特殊目录
+	if node.Info != nil && node.Info.IsDir() && node.Info.Name() == "." {
+		return 0
+	}
+
+	count := 1 // 当前节点
+	for _, child := range node.Children {
+		count += countNodes(child)
+	}
+	return count
+}

@@ -73,6 +73,9 @@ func (t *TreeTraverser) Traverse(node *Node, path string, level int, visitor Nod
 	}
 
 	if node.IsDir {
+		if node.Name == "." {
+			return nil
+		}
 		// 对子节点进行排序以保证遍历顺序一致
 		children := make([]*Node, 0, len(node.Children))
 		for _, child := range node.Children {
@@ -108,7 +111,7 @@ func (t *TreeTraverser) Traverse(node *Node, path string, level int, visitor Nod
 						wg.Done()
 						doneChan <- struct{}{}
 					}()
-					
+
 					if err := t.Traverse(c, p, level+1, visitor); err != nil {
 						errChan <- err
 						return
