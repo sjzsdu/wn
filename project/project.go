@@ -8,13 +8,14 @@ import (
 )
 
 // NewProject 创建一个新的文档树
-func NewProject() *Project {
+func NewProject(rootPath string) *Project {
 	return &Project{
 		root: &Node{
 			Name:     "/",
 			IsDir:    true,
 			Children: make(map[string]*Node),
 		},
+		rootPath: rootPath,
 	}
 }
 
@@ -204,4 +205,10 @@ func (d *Project) IsEmpty() bool {
 	defer d.root.mu.RUnlock()
 
 	return len(d.root.Children) == 0
+}
+
+func (p *Project) GetAbsolutePath(path string) string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return filepath.Join(p.rootPath, path)
 }

@@ -33,6 +33,7 @@ func NewBaseChatter(p *Project) *BaseChatter {
 
 // VisitDirectory 实现通用的目录访问逻辑
 func (b *BaseChatter) VisitDirectory(node *Node, path string, level int) error {
+	path = b.project.GetAbsolutePath(path)
 	hash, err := node.CalculateHash()
 	if err != nil {
 		return err
@@ -70,6 +71,7 @@ func (b *BaseChatter) VisitDirectory(node *Node, path string, level int) error {
 
 // VisitFile 实现通用的文件访问逻辑
 func (b *BaseChatter) VisitFile(node *Node, path string, level int) error {
+	path = b.project.GetAbsolutePath(path)
 	hash, err := node.CalculateHash()
 	if err != nil {
 		return err

@@ -27,7 +27,7 @@ var excludedDirs = map[string]bool{
 
 // BuildProjectTree 构建项目树
 func BuildProjectTree(targetPath string, options helper.WalkDirOptions) (*Project, error) {
-	doc := NewProject()
+	doc := NewProject(targetPath)
 	gitignoreRules := make(map[string][]string)
 	targetPath = filepath.Clean(targetPath)
 

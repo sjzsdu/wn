@@ -22,8 +22,9 @@ type Node struct {
 
 // Project 表示整个文档树
 type Project struct {
-	root *Node
-	mu   sync.RWMutex
+	root     *Node
+	rootPath string
+	mu       sync.RWMutex
 }
 
 func (node *Node) SetLLMResponse(response string) *Node {

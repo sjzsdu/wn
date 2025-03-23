@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"sync"
 )
 
 // NodeVisitor 定义了节点访问器的接口
@@ -34,6 +35,7 @@ type TreeTraverser struct {
 	project *Project
 	order   TraverseOrder
 	option  *TraverseOption
+	wg      sync.WaitGroup  // 添加等待组
 }
 
 // SetOption 设置遍历选项
@@ -50,11 +52,12 @@ func (t *TreeTraverser) handleError(err error) error {
 	return err
 }
 
-// NewTreeTraverser 创建一个树遍历器，默认使用后序遍历
+// NewTreeTraverser 创建一个树遍历器，默认使用前序遍历
 func NewTreeTraverser(p *Project) *TreeTraverser {
 	return &TreeTraverser{
 		project: p,
 		order:   PreOrder,
+		option:  nil,
 	}
 }
 
@@ -91,6 +94,9 @@ func (t *TreeTraverser) Traverse(node *Node, path string, level int, visitor Nod
 			return children[i].Name < children[j].Name
 		})
 
+		// 创建错误通道
+		errChan := make(chan error, len(children))
+		
 		switch t.order {
 		case PreOrder:
 			if err := visitor.VisitDirectory(node, path, level); err != nil {
@@ -104,13 +110,36 @@ func (t *TreeTraverser) Traverse(node *Node, path string, level int, visitor Nod
 			}
 
 		case PostOrder:
+			// 并发处理子节点
 			for _, child := range children {
 				childPath := filepath.Join(path, child.Name)
-				fmt.Println("childPath:", childPath)
-				if err := t.Traverse(child, childPath, level+1, visitor); err != nil {
-					return err
+				if !child.IsDir {
+					t.wg.Add(1)
+					go func(c *Node, p string) {
+						defer t.wg.Done()
+						if err := t.Traverse(c, p, level+1, visitor); err != nil {
+							errChan <- err
+						}
+					}(child, childPath)
+				} else {
+					// 目录节点保持同步处理
+					if err := t.Traverse(child, childPath, level+1, visitor); err != nil {
+						return err
+					}
 				}
 			}
+
+			// 等待所有文件处理完成
+			t.wg.Wait()
+			
+			// 检查是否有错误发生
+			select {
+			case err := <-errChan:
+				return err
+			default:
+			}
+
+			// 处理当前目录
 			if err := visitor.VisitDirectory(node, path, level); err != nil {
 				return err
 			}
