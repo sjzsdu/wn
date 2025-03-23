@@ -196,12 +196,27 @@ func ReadGitignore(dir string) ([]string, error) {
 func IsPathExcluded(path string, excludes []string, rootDir string) bool {
 	// 检查自定义排除规则
 	for _, pattern := range excludes {
-		if strings.Contains(path, pattern) {
-			return true
-		}
+		// 使用完整路径进行匹配
 		matched, err := filepath.Match(pattern, filepath.Base(path))
 		if err == nil && matched {
 			return true
+		}
+		
+		// 检查相对路径
+		relPath, err := filepath.Rel(rootDir, path)
+		if err == nil {
+			matched, err = filepath.Match(pattern, relPath)
+			if err == nil && matched {
+				return true
+			}
+		}
+
+		// 对于包含 ** 的模式，需要特殊处理
+		if strings.Contains(pattern, "**") {
+			pattern = strings.ReplaceAll(pattern, "**", "*")
+			if strings.Contains(path, pattern) {
+				return true
+			}
 		}
 	}
 

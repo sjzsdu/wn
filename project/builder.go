@@ -43,6 +43,12 @@ func BuildProjectTree(targetPath string, options helper.WalkDirOptions) (*Projec
 			if name == "." || name == ".." {
 				return nil
 			}
+
+			// 对于非根目录的情况才检查排除规则
+			if path != targetPath && excludedDirs[name] {
+				return filepath.SkipDir
+			}
+
 			if excludedDirs[name] {
 				return filepath.SkipDir
 			}

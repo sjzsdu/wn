@@ -7,6 +7,7 @@ import (
 	"github.com/sjzsdu/wn/data"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
+	"github.com/sjzsdu/wn/share"
 )
 
 // Chatter 定义了项目聊天器的接口
@@ -52,9 +53,17 @@ func (b *BaseChatter) VisitDirectory(node *Node, path string, level int) error {
 
 	// 缓存未命中，调用 LLM
 	messages := PrepareDirectoryMessage(path)
+	
+	childrenResponses, err := node.GetChildrenResponses()
+	if err != nil {
+		// 如果是空内容错误，设置特殊响应并返回
+		node.SetLLMResponse(fmt.Sprintf("目录分析跳过: %v", err))
+		return nil
+	}
+	
 	messages = append(messages, llm.Message{
 		Role:    "user",
-		Content: "请分析这个目录结构：" + node.GetChildrenResponses(),
+		Content: "请分析这个目录结构：" + childrenResponses,
 	})
 	req := llm.CompletionRequest{
 		Messages: messages,
@@ -87,7 +96,7 @@ func (b *BaseChatter) VisitFile(node *Node, path string, level int) error {
 	}
 
 	if !helper.IsProgramFile(path) {
-		node.SetLLMResponse("Not a program file")
+		node.SetLLMResponse(share.NOT_PROGRAM_TIP)
 		return nil
 	}
 

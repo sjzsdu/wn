@@ -3,6 +3,7 @@ package helper
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 func GetTargetPath(cmdPath string, gitURL string) (string, error) {
@@ -24,8 +25,19 @@ func GetTargetPath(cmdPath string, gitURL string) (string, error) {
 			}
 			targetPath = currentDir
 		} else {
-			targetPath = cmdPath
+			// 处理相对路径
+			if !filepath.IsAbs(cmdPath) {
+				currentDir, err := os.Getwd()
+				if err != nil {
+					return "", fmt.Errorf("error getting current directory: %v", err)
+				}
+				targetPath = filepath.Join(currentDir, cmdPath)
+			} else {
+				targetPath = cmdPath
+			}
 		}
 	}
-	return targetPath, nil
+
+	// 清理路径（移除 .. 和 . 等）
+	return filepath.Clean(targetPath), nil
 }

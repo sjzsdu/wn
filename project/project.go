@@ -2,6 +2,7 @@ package project
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 // NewProject 创建一个新的文档树
 func NewProject(rootPath string) *Project {
+	fmt.Println("rootPath", rootPath)
 	return &Project{
 		root: &Node{
 			Name:     "/",
@@ -208,7 +210,5 @@ func (d *Project) IsEmpty() bool {
 }
 
 func (p *Project) GetAbsolutePath(path string) string {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
 	return filepath.Join(p.rootPath, path)
 }

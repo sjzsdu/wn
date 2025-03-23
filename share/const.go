@@ -17,3 +17,5 @@ const TIMEOUT = time.Second * 60 * 5
 const MAX_TOKENS = 8192
 
 const CACHE_TYPE = "json"
+
+const NOT_PROGRAM_TIP = "This is not a program file."

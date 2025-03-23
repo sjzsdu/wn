@@ -3,10 +3,13 @@ package project
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/sjzsdu/wn/share"
 )
 
 type Node struct {
@@ -78,18 +81,41 @@ func (node *Node) calculateDirHash() (string, error) {
 }
 
 // GetChildrenResponses 获取直接子节点的 LLMResponse 内容
-func (node *Node) GetChildrenResponses() string {
-
+func (node *Node) GetChildrenResponses() (string, error) {
 	if !node.IsDir || len(node.Children) == 0 {
-		return ""
+		return "", nil
 	}
 
 	var responses []string
-	for name, child := range node.Children {
+	hasValidContent := false
+
+	// 对子节点进行排序以保证顺序一致
+	children := make([]*Node, 0, len(node.Children))
+	for _, child := range node.Children {
+		children = append(children, child)
+	}
+	sort.Slice(children, func(i, j int) bool {
+		return children[i].Name < children[j].Name
+	})
+
+	for _, child := range children {
+		// 跳过非程序文件的响应
+		if child.LLMResponse == share.NOT_PROGRAM_TIP {
+			continue
+		}
+
 		if child.LLMResponse != "" {
-			responses = append(responses, name+":\n"+child.LLMResponse)
+			if !child.IsDir && len(child.Content) == 0 {
+				return "", fmt.Errorf("empty file content: %s", child.Name)
+			}
+			responses = append(responses, child.Name+":\n"+child.LLMResponse)
+			hasValidContent = true
 		}
 	}
 
-	return strings.Join(responses, "\n\n")
+	if !hasValidContent || len(responses) == 0 {
+		return "", fmt.Errorf("no valid content found in directory")
+	}
+
+	return strings.Join(responses, "\n\n"), nil
 }
