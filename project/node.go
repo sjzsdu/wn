@@ -35,6 +35,10 @@ func (node *Node) SetLLMResponse(response string) *Node {
 	return node
 }
 
+func (node *Node) GetLLMResponse() string {
+	return node.LLMResponse
+}
+
 // CalculateHash 计算节点的哈希值
 func (node *Node) CalculateHash() (string, error) {
 	if node.IsDir {

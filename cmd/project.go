@@ -42,6 +42,7 @@ func runproject(cmd *cobra.Command, args []string) {
 
 	traverser := project.NewBaseChatter(doc)
 	traverser.ChatWithLLM()
+	data := doc.GetLLMResponse()
 
-	fmt.Printf("Successfully exported project to %s\n", output)
+	fmt.Println(data)
 }

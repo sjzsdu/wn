@@ -221,6 +221,13 @@ func (p *Project) GetTotalNodes() int {
 	return countNodes(p.root)
 }
 
+func (p *Project) GetLLMResponse() string {
+	if p.root == nil {
+		return ""
+	}
+	return p.root.GetLLMResponse()
+}
+
 func countNodes(node *Node) int {
 	if node == nil || node.Name == "." {
 		return 0
