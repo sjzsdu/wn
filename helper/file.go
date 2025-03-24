@@ -201,7 +201,7 @@ func IsPathExcluded(path string, excludes []string, rootDir string) bool {
 		if err == nil && matched {
 			return true
 		}
-		
+
 		// 检查相对路径
 		relPath, err := filepath.Rel(rootDir, path)
 		if err == nil {
@@ -325,6 +325,17 @@ func GetPath(subPath string) string {
 	configFile := filepath.Join(homeDir, share.PATH, subPath)
 
 	return configFile
+}
+
+func GetAbsPath(path string) (string, error) {
+	if path == "" || !filepath.IsAbs(path) {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("error getting current directory: %v", err)
+		}
+		return filepath.Join(currentDir, path), nil
+	}
+	return filepath.Clean(path), nil
 }
 
 func CheckFilesExist(files string) error {

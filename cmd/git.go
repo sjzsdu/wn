@@ -106,8 +106,13 @@ var listCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(gitCmd)
 
+	// 为命令添加全局标志
+	gitCmd.PersistentFlags().StringVarP(&commitHash, "commit", "c", "", "指定提交哈希")
+	gitCmd.PersistentFlags().StringVarP(&modifiedFiles, "files", "f", "", "指定修改的文件，多个文件用逗号分隔")
+	gitCmd.PersistentFlags().StringVarP(&branchName, "branch", "b", "", "指定分支名称")
+
 	// 添加子命令
 	gitCmd.AddCommand(commitCmd)
 	gitCmd.AddCommand(rebaseCmd)
-	gitCmd.AddCommand(listCmd) // 添加新的子命令
+	gitCmd.AddCommand(listCmd)
 }

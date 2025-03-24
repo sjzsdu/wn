@@ -46,6 +46,9 @@ func (cm *CacheManager) FindContent(path, hash string) (string, bool, error) {
 
 // SetRecord 设置或更新缓存记录
 func (cm *CacheManager) SetRecord(path, hash, content string) *CacheManager {
+	// 先删除已存在的记录
+	_ = cm.RemoveRecord(path)
+
 	record := &CacheRecord{
 		Path:    path,
 		Hash:    hash,
@@ -56,6 +59,21 @@ func (cm *CacheManager) SetRecord(path, hash, content string) *CacheManager {
 		// 用户可以通过其他方法检查最后的错误状态
 	}
 	return cm
+}
+
+// FindByPath 根据路径查找缓存记录
+func (cm *CacheManager) FindByPath(path string) (*CacheRecord, error) {
+	records, err := cm.storage.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	
+	for _, record := range records {
+		if record.Path == path {
+			return record, nil
+		}
+	}
+	return nil, nil
 }
 
 // RemoveRecord 删除缓存记录

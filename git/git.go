@@ -28,7 +28,8 @@ type EditCommitOptions struct {
 // Init 初始化 git 相关变量
 func init() {
 	// 检查是否在 git 仓库中
-	if err := ExecGitCommand("git", "rev-parse", "--git-dir"); err != nil {
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	if err := cmd.Run(); err != nil {
 		IsGitRepo = false
 		return
 	}
