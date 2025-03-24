@@ -303,6 +303,18 @@ func (c *aiCommand) getContextMessages() []llm.Message {
 	return append(contextMessages, messages[start:]...)
 }
 
+func (c *aiCommand) SetMessage(msgs []llm.Message) *aiCommand {
+	for _, msg := range msgs {
+		c.msgManager.Append(msg)
+	}
+	return c
+}
+
+func (c *aiCommand) SetAgent(agent string) *aiCommand {
+	c.useAgent = agent
+	return c
+}
+
 func init() {
 	aiCmd := newAICommand()
 	rootCmd.AddCommand(aiCmd.cmd)

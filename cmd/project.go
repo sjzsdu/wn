@@ -5,6 +5,7 @@ import (
 
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
+	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/project"
 	"github.com/spf13/cobra"
 )
@@ -44,5 +45,21 @@ func runproject(cmd *cobra.Command, args []string) {
 	traverser.ChatWithLLM()
 	data := doc.GetLLMResponse()
 
-	fmt.Println(data)
+	// 创建 AI 命令实例并设置消息
+	aiCmd := newAICommand()
+	aiCmd.SetMessage([]llm.Message{
+		{
+			Role:    "user",
+			Content: data,
+		},
+	}).SetAgent("project")
+	// 获取默认的 provider
+	provider, err := llm.GetProvider("", nil)
+	if err != nil {
+		fmt.Printf("failed to get provider: %v\n", err)
+		return
+	}
+
+	// 直接开始聊天
+	aiCmd.startChat(provider)
 }
