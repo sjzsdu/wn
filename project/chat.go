@@ -7,7 +7,6 @@ import (
 	"github.com/sjzsdu/wn/data"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
-	"github.com/sjzsdu/wn/share"
 )
 
 // Chatter 定义了项目聊天器的接口
@@ -49,7 +48,6 @@ func (b *BaseChatter) VisitDirectory(node *Node, path string, level int) error {
 		node.SetLLMResponse(content)
 		return nil
 	}
-	fmt.Println("visit directory:", path)
 
 	// 缓存未命中，调用 LLM
 	messages := PrepareDirectoryMessage(path)
@@ -57,24 +55,20 @@ func (b *BaseChatter) VisitDirectory(node *Node, path string, level int) error {
 	childrenResponses, err := node.GetChildrenResponses()
 	if err != nil {
 		// 如果是空内容错误，设置特殊响应并返回
-		node.SetLLMResponse(fmt.Sprintf("目录分析跳过: %v", err))
+		node.LLMResponse = NewNotProgramResponse()
 		return nil
 	}
 
 	messages = append(messages, llm.Message{
 		Role:    "user",
-		Content: "请分析这个目录结构：" + childrenResponses,
+		Content: childrenResponses,
 	})
-	req := llm.CompletionRequest{
-		Messages: messages,
-	}
-
-	resp, err := b.llm.Complete(context.Background(), req)
+	resContent, err := b.ensureValidJSONResponse(context.Background(), messages)
 	if err != nil {
 		return err
 	}
-	node.SetLLMResponse(resp.Content)
-	b.cache.SetRecord(path, hash, resp.Content).Close()
+	node.SetLLMResponse(resContent)
+	b.cache.SetRecord(path, hash, resContent).Close()
 	return nil
 }
 
@@ -96,11 +90,9 @@ func (b *BaseChatter) VisitFile(node *Node, path string, level int) error {
 	}
 
 	if !helper.IsProgramFile(path) {
-		node.SetLLMResponse(share.NOT_PROGRAM_TIP)
+		node.LLMResponse = NewNotProgramResponse()
 		return nil
 	}
-
-	fmt.Println("visit file:", path)
 
 	// 缓存未命中，调用 LLM
 	messages := PrepareFileMessage(path)
@@ -108,25 +100,52 @@ func (b *BaseChatter) VisitFile(node *Node, path string, level int) error {
 		Role:    "user",
 		Content: string(node.Content),
 	})
-	req := llm.CompletionRequest{
-		Messages: messages,
-	}
-
-	resp, err := b.llm.Complete(context.Background(), req)
+	resContent, err := b.ensureValidJSONResponse(context.Background(), messages)
 	if err != nil {
 		return err
 	}
-	node.SetLLMResponse(resp.Content)
+	node.SetLLMResponse(resContent)
 	// 保存到缓存
-	b.cache.SetRecord(path, hash, resp.Content).Close()
+	b.cache.SetRecord(path, hash, resContent).Close()
 	return nil
+}
+
+// ensureValidJSONResponse 确保获取到有效的JSON响应
+func (b *BaseChatter) ensureValidJSONResponse(ctx context.Context, messages []llm.Message) (string, error) {
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		req := llm.CompletionRequest{
+			Messages: messages,
+		}
+
+		resp, err := b.llm.Complete(ctx, req)
+		if err != nil {
+			return "", err
+		}
+
+		// 验证返回的内容是否为有效的JSON
+		if _, err := NewLLMResponse(resp.Content); err == nil {
+			return resp.Content, nil
+		}
+
+		// 如果不是有效的JSON，添加新的提示要求返回JSON格式
+		messages = append(messages, llm.Message{
+			Role:    "assistant",
+			Content: resp.Content,
+		}, llm.Message{
+			Role:    "user",
+			Content: "请将上述响应重新组织为有效的JSON格式，确保包含完整的函数、类、接口等信息，并严格遵循指定的JSON结构。",
+		})
+	}
+
+	return "", fmt.Errorf("无法获取有效的JSON响应，已重试%d次", maxRetries)
 }
 
 func (b *BaseChatter) ChatWithLLM() error {
 	totalNodes := b.project.GetTotalNodes()
 	progress := helper.NewProgress("处理项目文件", totalNodes)
+	progress.Show()
 
-	// 创建一个包装访问器来更新进度
 	visitor := &progressVisitor{
 		BaseChatter: b,
 		progress:    progress,

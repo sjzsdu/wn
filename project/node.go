@@ -4,39 +4,60 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
-	"sync"
-
-	"github.com/sjzsdu/wn/share"
 )
 
-type Node struct {
-	Name        string
-	IsDir       bool
-	Info        os.FileInfo
-	Content     []byte
-	LLMResponse string
-	Children    map[string]*Node // 改回 map 类型
-	Parent      *Node
-	mu          sync.RWMutex
-}
-
-// Project 表示整个文档树
-type Project struct {
-	root     *Node
-	rootPath string
-	mu       sync.RWMutex
-}
-
 func (node *Node) SetLLMResponse(response string) *Node {
-	node.LLMResponse = response
+	llmResp, err := NewLLMResponse(response)
+	if err != nil {
+		// 如果解析失败，可以记录日志或者其他处理
+		return node
+	}
+	node.LLMResponse = llmResp
 	return node
 }
 
 func (node *Node) GetLLMResponse() string {
-	return node.LLMResponse
+	if node.LLMResponse == nil {
+		return ""
+	}
+	jsonStr, err := node.LLMResponse.ToJSON()
+	if err != nil {
+		return ""
+	}
+	return jsonStr
+}
+
+// GetLLMResponseContent 返回所有符号的名称和特性
+func (node *Node) GetLLMResponseContent() interface{} {
+	if node.LLMResponse == nil {
+		return nil
+	}
+
+	var result []Item
+	// 从 Functions 添加
+	for _, f := range node.LLMResponse.Functions {
+		result = append(result, Item{Name: f.Name, Feature: f.Feature})
+	}
+	// 从 Classes 添加
+	for _, c := range node.LLMResponse.Classes {
+		result = append(result, Item{Name: c.Name, Feature: c.Feature})
+	}
+	// 从 Interfaces 添加
+	for _, i := range node.LLMResponse.Interfaces {
+		result = append(result, Item{Name: i.Name, Feature: i.Feature})
+	}
+	// 从 Variables 添加
+	for _, v := range node.LLMResponse.Variables {
+		result = append(result, Item{Name: v.Name, Feature: v.Feature})
+	}
+	// 从 OtherSymbols 添加
+	for _, s := range node.LLMResponse.OtherSymbols {
+		result = append(result, Item{Name: s.Name, Feature: s.Feature})
+	}
+
+	return result
 }
 
 // CalculateHash 计算节点的哈希值
@@ -104,16 +125,24 @@ func (node *Node) GetChildrenResponses() (string, error) {
 
 	for _, child := range children {
 		// 跳过非程序文件的响应
-		if child.LLMResponse == share.NOT_PROGRAM_TIP {
+		if child.LLMResponse != nil && child.LLMResponse.IsNotProgramResponse() {
 			continue
 		}
 
-		if child.LLMResponse != "" {
+		if child.LLMResponse != nil {
 			if !child.IsDir && len(child.Content) == 0 {
 				return "", fmt.Errorf("empty file content: %s", child.Name)
 			}
-			responses = append(responses, child.Name+":\n"+child.LLMResponse)
-			hasValidContent = true
+			
+			// 使用简化版的响应内容
+			if items, ok := child.GetLLMResponseContent().([]Item); ok {
+				var itemStrs []string
+				for _, item := range items {
+					itemStrs = append(itemStrs, fmt.Sprintf("%s: %s", item.Name, item.Feature))
+				}
+				responses = append(responses, fmt.Sprintf("%s:\n%s", child.Name, strings.Join(itemStrs, "\n")))
+				hasValidContent = true
+			}
 		}
 	}
 

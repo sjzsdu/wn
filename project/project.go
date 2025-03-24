@@ -2,7 +2,6 @@ package project
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,7 +9,6 @@ import (
 
 // NewProject 创建一个新的文档树
 func NewProject(rootPath string) *Project {
-	fmt.Println("rootPath", rootPath)
 	return &Project{
 		root: &Node{
 			Name:     "/",
@@ -23,6 +21,9 @@ func NewProject(rootPath string) *Project {
 
 // CreateDir 创建一个新目录
 func (d *Project) CreateDir(path string, info os.FileInfo) error {
+	if path == "." {
+		return nil
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
