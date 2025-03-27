@@ -252,3 +252,10 @@ func (p *Project) GetAllFiles() ([]string, error) {
 	}
 	return files, nil
 }
+
+func (p *Project) GetName() string {
+	if p.rootPath == "" {
+		return "root"
+	}
+	return filepath.Base(p.rootPath)
+}

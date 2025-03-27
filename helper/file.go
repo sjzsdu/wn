@@ -143,6 +143,75 @@ var textExtensions = map[string]bool{
 	".html": true, ".css": true, ".java": true, ".c": true, ".cpp": true, ".h": true,
 	".rb": true, ".php": true, ".sh": true, ".bat": true, ".ps1": true, ".sql": true,
 	".r": true, ".scala": true, ".swift": true, ".mdx": true,
+	".kt": true, ".groovy": true, ".dart": true, ".lua": true, ".perl": true,
+	".hs": true, ".erl": true, ".ex": true, ".rs": true, ".fs": true, ".vb": true,
+	".asm": true, ".s": true, ".pl": true, ".pm": true, ".t": true, ".pod": true,
+	".ini": true, ".cfg": true, ".conf": true, ".properties": true, ".toml": true,
+	".lock": true, ".env": true, ".gitignore": true, ".dockerignore": true,
+	".editorconfig": true, ".eslintrc": true, ".prettierrc": true, ".babelrc": true,
+	".tsv": true, ".tsx": true, ".jsx": true, ".vue": true, ".svelte": true,
+	".graphql": true, ".gql": true, ".proto": true, ".thrift": true, ".avdl": true,
+	".avpr": true, ".avsc": true, ".idl": true, ".puml": true, ".plantuml": true,
+	".dot": true, ".gv": true, ".mmd": true, ".mermaid": true, ".sv": true,
+	".v": true, ".vh": true, ".svh": true, ".vhd": true, ".vhdl": true,
+	".tex": true, ".sty": true, ".cls": true, ".bib": true, ".bst": true,
+	".adoc": true, ".asciidoc": true, ".rst": true, ".rest": true, ".wiki": true,
+	".markdown": true, ".mdown": true, ".mkdn": true, ".mkd": true, ".mdwn": true,
+	".mdtxt": true, ".mdtext": true, ".text": true, ".creole": true, ".mediawiki": true,
+	".twig": true, ".j2": true, ".jinja": true, ".jinja2": true, ".njk": true,
+	".ejs": true, ".haml": true, ".pug": true, ".slim": true, ".styl": true,
+	".less": true, ".sass": true, ".scss": true, ".stylus": true, ".postcss": true,
+	".pcss": true, ".sss": true, ".coffee": true, ".litcoffee": true, ".iced": true,
+	".cson": true, ".pegjs": true, ".jison": true, ".jisonlex": true, ".lex": true,
+	".y": true, ".yacc": true, ".ebnf": true, ".bnf": true, ".abnf": true,
+	".peg": true, ".pegcoffee": true, ".pegiced": true, ".pegjison": true,
+	".peglex": true, ".pegy": true, ".pegyacc": true, ".pegebnf": true, ".pegbnf": true,
+	".pegabnf": true, ".pegpeg": true, ".pegpegjs": true, ".pegpegcoffee": true,
+	".pegpegiced": true, ".pegpegjison": true, ".pegpeglex": true, ".pegpegy": true,
+	".pegpegyacc": true, ".pegpegebnf": true, ".pegpegbnf": true, ".pegpegabnf": true,
+}
+
+// GetMimeType 根据文件扩展名获取 MIME 类型
+func GetMimeType(ext string) string {
+	switch strings.ToLower(ext) {
+	case ".md", ".markdown", ".mdown", ".mkdn", ".mkd", ".mdwn", ".mdtxt", ".mdtext":
+		return "text/markdown"
+	case ".json":
+		return "application/json"
+	case ".go":
+		return "text/x-go"
+	case ".py":
+		return "text/x-python"
+	case ".js":
+		return "application/javascript"
+	case ".ts":
+		return "application/typescript"
+	case ".html":
+		return "text/html"
+	case ".css":
+		return "text/css"
+	case ".java":
+		return "text/x-java"
+	case ".c", ".h":
+		return "text/x-c"
+	case ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx":
+		return "text/x-c++"
+	case ".rb":
+		return "text/x-ruby"
+	case ".php":
+		return "application/x-httpd-php"
+	case ".sh":
+		return "application/x-sh"
+	case ".bat":
+		return "application/x-msdos-program"
+	case ".ps1":
+		return "application/x-powershell"
+	case ".sql":
+		return "application/sql"
+	// 添加更多类型...
+	default:
+		return "text/plain"
+	}
 }
 
 func isReadableTextFile(path string) bool {
@@ -289,7 +358,7 @@ func matchGitignoreRule(path, rule string) bool {
 	}
 
 	// Handle directory-specific rules
-	if strings.HasSuffix(rule, "/") {
+	if rule != "" && strings.HasSuffix(rule, "/") {
 		rule = rule[:len(rule)-1]
 	}
 

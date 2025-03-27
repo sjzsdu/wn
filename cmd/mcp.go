@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/mark3labs/mcp-go/client"
@@ -16,6 +14,7 @@ import (
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/project"
 	"github.com/sjzsdu/wn/wnmcp"
+	"github.com/sjzsdu/wn/wnmcp/servers"
 	"github.com/spf13/cobra"
 )
 
@@ -53,7 +52,7 @@ func init() {
 	rootCmd.AddCommand(mcpCmd)
 
 	mcpCmd.PersistentFlags().StringVar(&mcpLayer, "layer", "stdio", lang.T("MCP transfer layer"))
-	mcpCmd.PersistentFlags().StringVar(&mcpPort, "port", "8080", lang.T("MCP sse port"))
+	mcpCmd.PersistentFlags().StringVar(&mcpPort, "port", "9595", lang.T("MCP sse port"))
 	mcpCmd.AddCommand(mcpServerCmd)
 	mcpCmd.AddCommand(mcpClientCmd)
 
@@ -64,9 +63,9 @@ func init() {
 }
 
 func runMcpServer(cmd *cobra.Command, args []string) {
-	targetPath, err := helper.GetTargetPath(cmdPath, gitURL)
-	if err != nil {
-		fmt.Printf("failed to get target path: %v\n", err)
+	targetPath, ferr := helper.GetTargetPath(cmdPath, gitURL)
+	if ferr != nil {
+		fmt.Printf("failed to get target path: %v\n", ferr)
 		return
 	}
 
@@ -77,89 +76,48 @@ func runMcpServer(cmd *cobra.Command, args []string) {
 	}
 
 	// 构建项目树
-	project, err := project.BuildProjectTree(targetPath, options)
-	if err != nil {
-		fmt.Printf("failed to build project tree: %v\n", err)
+	project, perr := project.BuildProjectTree(targetPath, options)
+	if perr != nil {
+		fmt.Printf("failed to build project tree: %v\n", perr)
 		return
 	}
-
-	// 创建 MCP 服务器
-	s := server.NewMCPServer(
-		"WN MCP Server: file system",
-		"1.0.0",
-	)
-
-	// 添加项目文件列表资源
-	fileListResource := mcp.NewResource(
-		"files://list",
-		"Project Files List",
-		mcp.WithResourceDescription("List all files in the project"),
-		mcp.WithMIMEType("application/json"),
-	)
-
-	s.AddResource(fileListResource, func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
-		files, err := project.GetAllFiles()
-
-		fileList, err := json.Marshal(files)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal file list: %v", err)
-		}
-
-		return []mcp.ResourceContents{
-			mcp.TextResourceContents{
-				URI:      "files://list",
-				MIMEType: "application/json",
-				Text:     string(fileList),
-			},
-		}, nil
-	})
-
-	// 添加动态资源模板
-	template := mcp.NewResourceTemplate(
-		"file://{path}",
-		"Project Files",
-		mcp.WithTemplateDescription("Access project files"),
-		mcp.WithTemplateMIMEType("text/plain"),
-	)
-
-	// 添加资源处理器
-	s.AddResourceTemplate(template, func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
-		// 从 URI 中提取文件路径
-		filePath := filepath.Join(targetPath, request.Params.URI)
-
-		// 读取文件内容
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read file: %v", err)
-		}
-
-		// 确定文件的 MIME 类型
-		mimeType := "text/plain"
-		switch filepath.Ext(filePath) {
-		case ".md":
-			mimeType = "text/markdown"
-		case ".json":
-			mimeType = "application/json"
-		case ".go":
-			mimeType = "text/x-go"
-		}
-
-		return []mcp.ResourceContents{
-			mcp.TextResourceContents{
-				URI:      request.Params.URI,
-				MIMEType: mimeType,
-				Text:     string(content),
-			},
-		}, nil
-	})
+	servers.NewProject(project)
 
 	fmt.Printf("Starting MCP server at %s...\n", targetPath)
-	if err := server.ServeStdio(s); err != nil {
-		log.Fatalf("Server error: %v", err)
+
+	var err error
+	switch mcpLayer {
+	case "sse":
+		if !helper.IsValidPort(mcpPort) {
+			log.Fatalf("无效的端口号: %s", mcpPort)
+		}
+		sseServer := server.NewSSEServer(wnmcp.McpServer())
+		err = sseServer.Start(":" + mcpPort)
+	case "stdio":
+		err = server.ServeStdio(wnmcp.McpServer())
+	default:
+		log.Fatalf("不支持的传输层: %s", mcpLayer)
+	}
+	if err != nil {
+		log.Fatalf("服务器错误: %v", err)
 	}
 }
 
 func runMcpClient(cmd *cobra.Command, args []string) {
+	targetPath, ferr := helper.GetTargetPath(cmdPath, gitURL)
+	if ferr != nil {
+		fmt.Printf("failed to get target path: %v\n", ferr)
+		return
+	}
+	options := helper.WalkDirOptions{
+		DisableGitIgnore: disableGitIgnore,
+		Extensions:       extensions,
+		Excludes:         excludes,
+	}
+
+	// 构建项目树
+	project, _ := project.BuildProjectTree(targetPath, options)
+
 	// 初始化 MCP 客户端
 	mcpClient, err := client.NewStdioMCPClient(
 		mcpCommand,
@@ -228,7 +186,7 @@ func runMcpClient(cmd *cobra.Command, args []string) {
 
 	// 尝试读取文件列表
 	fmt.Println("=== 项目文件列表 ===")
-	fileList, err := mcpClient.ReadResource(ctx, wnmcp.NewReadResourceRequest("files://list", nil))
+	fileList, err := mcpClient.ReadResource(ctx, wnmcp.NewReadResourceRequest("files://"+project.GetName(), nil))
 	if err != nil {
 		log.Printf("读取文件列表失败: %v\n", err)
 	} else {
