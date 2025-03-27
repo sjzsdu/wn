@@ -133,7 +133,7 @@ func (node *Node) GetChildrenResponses() (string, error) {
 			if !child.IsDir && len(child.Content) == 0 {
 				return "", fmt.Errorf("empty file content: %s", child.Name)
 			}
-			
+
 			// 使用简化版的响应内容
 			if items, ok := child.GetLLMResponseContent().([]Item); ok {
 				var itemStrs []string
@@ -151,4 +151,21 @@ func (node *Node) GetChildrenResponses() (string, error) {
 	}
 
 	return strings.Join(responses, "\n\n"), nil
+}
+
+func countNodes(node *Node) int {
+	if node == nil || node.Name == "." {
+		return 0
+	}
+
+	// 检查是否是特殊目录
+	if node.Info != nil && node.Info.IsDir() && node.Info.Name() == "." {
+		return 0
+	}
+
+	count := 1 // 当前节点
+	for _, child := range node.Children {
+		count += countNodes(child)
+	}
+	return count
 }

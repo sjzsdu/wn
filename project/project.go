@@ -2,6 +2,7 @@ package project
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -229,19 +230,25 @@ func (p *Project) GetLLMResponse() string {
 	return p.root.GetLLMResponse()
 }
 
-func countNodes(node *Node) int {
-	if node == nil || node.Name == "." {
-		return 0
+// GetAllFiles 返回项目中所有文件的相对路径
+func (p *Project) GetAllFiles() ([]string, error) {
+	if p.root == nil {
+		return nil, fmt.Errorf("project root is nil")
 	}
 
-	// 检查是否是特殊目录
-	if node.Info != nil && node.Info.IsDir() && node.Info.Name() == "." {
-		return 0
-	}
+	var files []string
+	traverser := NewTreeTraverser(p)
+	visitor := VisitorFunc(func(path string, node *Node, depth int) error {
+		if node.IsDir {
+			return nil
+		}
+		files = append(files, path)
+		return nil
+	})
+	err := traverser.TraverseTree(visitor)
 
-	count := 1 // 当前节点
-	for _, child := range node.Children {
-		count += countNodes(child)
+	if err != nil {
+		return nil, err
 	}
-	return count
+	return files, nil
 }
