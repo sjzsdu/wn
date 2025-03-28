@@ -81,7 +81,8 @@ func runMcpServer(cmd *cobra.Command, args []string) {
 		fmt.Printf("failed to build project tree: %v\n", perr)
 		return
 	}
-	servers.NewProject(project)
+	servers.NewResource(project)
+	servers.NewTool(project)
 
 	fmt.Printf("Starting MCP server at %s...\n", targetPath)
 

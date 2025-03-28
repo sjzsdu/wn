@@ -12,8 +12,15 @@ import (
 	"github.com/sjzsdu/wn/wnmcp"
 )
 
-func NewProject(project *project.Project) {
+func NewResource(project *project.Project) {
 	name := project.GetName()
+
+	filesResouce(project, name)
+	statsResource(project, name)
+	templateResource(project, name)
+}
+
+func filesResouce(project *project.Project, name string) {
 	// 添加项目文件列表资源
 	fileListResource := mcp.NewResource(
 		"files://"+name,
@@ -38,11 +45,9 @@ func NewProject(project *project.Project) {
 			},
 		}, nil
 	})
-
-	templateSource(project, name)
 }
 
-func templateSource(project *project.Project, name string) {
+func templateResource(project *project.Project, name string) {
 
 	// 添加动态资源模板
 	template := mcp.NewResourceTemplate(
@@ -71,6 +76,45 @@ func templateSource(project *project.Project, name string) {
 				URI:      request.Params.URI,
 				MIMEType: mimeType,
 				Text:     string(content),
+			},
+		}, nil
+	})
+}
+
+func statsResource(project *project.Project, name string) {
+	// 添加项目统计信息资源
+	statsResource := mcp.NewResource(
+		"stats://"+name,
+		"Project Statistics",
+		mcp.WithResourceDescription("获取项目统计信息"),
+		mcp.WithMIMEType("application/json"),
+	)
+
+	wnmcp.McpServer().AddResource(statsResource, func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+		files, _ := project.GetAllFiles()
+
+		// 统计各类型文件数量
+		extStats := make(map[string]int)
+		for _, file := range files {
+			ext := filepath.Ext(file)
+			extStats[ext]++
+		}
+
+		stats := map[string]interface{}{
+			"fileCount":      len(files),
+			"extensionStats": extStats,
+		}
+
+		statsJSON, err := json.Marshal(stats)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal stats: %v", err)
+		}
+
+		return []mcp.ResourceContents{
+			mcp.TextResourceContents{
+				URI:      request.Params.URI,
+				MIMEType: "application/json",
+				Text:     string(statsJSON),
 			},
 		}, nil
 	})
