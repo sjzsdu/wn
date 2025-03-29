@@ -426,5 +426,8 @@ func CheckFilesExist(files string) error {
 
 func GetFileExt(file string) string {
 	ext := filepath.Ext(file)
+	if len(ext) <= 1 {
+		return ""
+	}
 	return ext[1:]
 }

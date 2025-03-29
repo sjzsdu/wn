@@ -3,6 +3,7 @@ package project
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/sjzsdu/wn/data"
 	"github.com/sjzsdu/wn/helper"
@@ -65,6 +66,7 @@ func (b *BaseChatter) VisitDirectory(node *Node, path string, level int) error {
 	})
 	resContent, err := b.ensureValidJSONResponse(context.Background(), messages)
 	if err != nil {
+		fmt.Printf("Directory:%s, %s", path, resContent)
 		return err
 	}
 	node.SetLLMResponse(resContent)
@@ -102,6 +104,7 @@ func (b *BaseChatter) VisitFile(node *Node, path string, level int) error {
 	})
 	resContent, err := b.ensureValidJSONResponse(context.Background(), messages)
 	if err != nil {
+		fmt.Printf("File:%s, %s", path, resContent)
 		return err
 	}
 	node.SetLLMResponse(resContent)
@@ -112,39 +115,39 @@ func (b *BaseChatter) VisitFile(node *Node, path string, level int) error {
 
 // ensureValidJSONResponse 确保获取到有效的JSON响应
 func (b *BaseChatter) ensureValidJSONResponse(ctx context.Context, messages []llm.Message) (string, error) {
-	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
-		req := llm.CompletionRequest{
-			Messages: messages,
-		}
-
-		resp, err := b.llm.Complete(ctx, req)
-		if err != nil {
-			return "", err
-		}
-
-		// 验证返回的内容是否为有效的JSON
-		if _, err := NewLLMResponse(resp.Content); err == nil {
-			return resp.Content, nil
-		}
-
-		// 如果不是有效的JSON，添加新的提示要求返回JSON格式
-		messages = append(messages, llm.Message{
-			Role:    "assistant",
-			Content: resp.Content,
-		}, llm.Message{
-			Role:    "user",
-			Content: "请将上述响应重新组织为有效的JSON格式，确保包含完整的函数、类、接口等信息，并严格遵循指定的JSON结构。",
-		})
+	req := llm.CompletionRequest{
+		Messages: messages,
 	}
 
-	return "", fmt.Errorf("无法获取有效的JSON响应，已重试%d次", maxRetries)
+	resp, err := b.llm.Complete(ctx, req)
+	if err != nil {
+		return "", err
+	}
+
+	// 处理返回内容中的 JSON 代码块
+	content := resp.Content
+	if strings.Contains(content, "```json") && strings.Contains(content, "```") {
+		// 提取 ```json 和 ``` 之间的内容
+		start := strings.Index(content, "```json") + 7
+		end := strings.LastIndex(content, "```")
+		if start < end {
+			content = strings.TrimSpace(content[start:end])
+		}
+	}
+	if _, err := NewLLMResponse(content); err != nil {
+		return "", fmt.Errorf("无效的 JSON 响应: %v, %s", err, content)
+	}
+
+	return content, nil
 }
 
 func (b *BaseChatter) ChatWithLLM() error {
 	totalNodes := b.project.GetTotalNodes()
 	progress := helper.NewProgress("处理项目文件", totalNodes)
 	progress.Show()
+	defer func() {
+		fmt.Println()
+	}()
 
 	visitor := &progressVisitor{
 		BaseChatter: b,
