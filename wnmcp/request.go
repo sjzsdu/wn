@@ -41,3 +41,38 @@ func NewReadResourceRequest(uri string, args map[string]interface{}) mcp.ReadRes
 		},
 	}
 }
+
+func NewPromptRequest(name string, args map[string]string) mcp.GetPromptRequest {
+	return mcp.GetPromptRequest{
+		Request: mcp.Request{
+			Method: string(mcp.MethodPromptsGet),
+		},
+		Params: struct {
+			// The name of the prompt or prompt template.
+			Name string `json:"name"`
+			// Arguments to use for templating the prompt.
+			Arguments map[string]string `json:"arguments,omitempty"`
+		}{
+			Name:      name,
+			Arguments: args,
+		},
+	}
+}
+
+func NewToolCallRequest(name string, args map[string]interface{}) mcp.CallToolRequest {
+	return mcp.CallToolRequest{
+		Request: mcp.Request{
+			Method: string(mcp.MethodToolsCall),
+		},
+		Params: struct {
+			Name      string                 `json:"name"`
+			Arguments map[string]interface{} `json:"arguments,omitempty"`
+			Meta      *struct {
+				ProgressToken mcp.ProgressToken `json:"progressToken,omitempty"`
+			} `json:"_meta,omitempty"`
+		}{
+			Name:      name,
+			Arguments: args,
+		},
+	}
+}

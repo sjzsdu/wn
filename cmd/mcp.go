@@ -1,14 +1,10 @@
 package cmd
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/mark3labs/mcp-go/client"
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
@@ -130,94 +126,17 @@ func runMcpClient(cmd *cobra.Command, args []string) {
 	}
 	defer mcpClient.Close()
 
-	// 创建带超时的上下文
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	wnClient := wnmcp.NewClient(mcpClient, project)
 
-	// 初始化客户端并打印服务器信息
-	initResult, err := mcpClient.Initialize(ctx, wnmcp.NewInitializeRequest())
-	if err != nil {
-		log.Fatalf("初始化失败: %v", err)
-	}
-	fmt.Printf("连接到服务器: %s %s\n\n", initResult.ServerInfo.Name, initResult.ServerInfo.Version)
-
-	// List Tools
-	// fmt.Println("Listing available tools...")
-	// toolsRequest := mcp.ListToolsRequest{}
-	// tools, err := mcpClient.ListTools(context.Background(), toolsRequest)
-	// if err != nil {
-	// 	log.Fatalf("Failed to list tools: %v", err)
-	// }
-	// for _, tool := range tools.Tools {
-	// 	fmt.Printf("- %s: %s\n", tool.Name, tool.Description)
-	// }
-	// fmt.Println()
-
-	// List Resources
-	fmt.Println("Listing available resources...")
-	resourcesRequest := mcp.ListResourcesRequest{}
-	resources, err := mcpClient.ListResources(context.Background(), resourcesRequest)
-	if err != nil {
-		log.Fatalf("Failed to list resources: %v", err)
-	}
-	for _, resource := range resources.Resources {
-		fmt.Printf("资源: %s\n", resource.URI)
-		fmt.Printf("名称: %s\n", resource.Name)
-		if resource.Description != "" {
-			fmt.Printf("描述: %s\n", resource.Description)
-		}
-		fmt.Printf("MIME类型: %s\n", resource.MIMEType)
-		fmt.Println()
-	}
+	wnClient.Ping()
 
 	// 列出所有资源模板
-	fmt.Println("=== 资源模板列表 ===")
-	templates, err := mcpClient.ListResourceTemplates(ctx, mcp.ListResourceTemplatesRequest{})
-	if err != nil {
-		log.Fatalf("获取资源模板列表失败: %v", err)
-	}
-	for _, template := range templates.ResourceTemplates {
-		fmt.Printf("名称: %s\n", template.Name)
-		if template.Description != "" {
-			fmt.Printf("描述: %s\n", template.Description)
-		}
-		fmt.Printf("MIME类型: %s\n", template.MIMEType)
-		fmt.Println()
-	}
+	wnClient.ListResourceTemplates()
 
-	// 尝试读取文件列表
-	fmt.Println("=== 项目文件列表 ===")
-	fileList, err := mcpClient.ReadResource(ctx, wnmcp.NewReadResourceRequest("files://"+project.GetName(), nil))
-	if err != nil {
-		log.Printf("读取文件列表失败: %v\n", err)
-	} else {
-		for _, content := range fileList.Contents {
-			if textContent, ok := content.(mcp.TextResourceContents); ok {
-				var files []string
-				if err := json.Unmarshal([]byte(textContent.Text), &files); err != nil {
-					log.Printf("解析文件列表失败: %v\n", err)
-				} else {
-					for _, file := range files {
-						fmt.Printf("- %s\n", file)
-					}
-				}
-			}
-		}
-	}
-	fmt.Println()
+	// 列出所有提示
+	wnClient.ListPrompts()
 
-	// 如果指定了具体文件，则读取文件内容
-	if len(args) >= 2 && args[0] == "resources/read" {
-		fmt.Printf("=== 读取文件: %s ===\n", args[1])
-		result, err := mcpClient.ReadResource(ctx, wnmcp.NewReadResourceRequest(args[1], nil))
-		if err != nil {
-			log.Fatalf("读取文件失败: %v", err)
-		}
-		for _, content := range result.Contents {
-			if textContent, ok := content.(mcp.TextResourceContents); ok {
-				fmt.Printf("MIME类型: %s\n", textContent.MIMEType)
-				fmt.Printf("内容:\n%s\n", textContent.Text)
-			}
-		}
-	}
+	// 列出所有工具
+	wnClient.ListTools()
+
 }
