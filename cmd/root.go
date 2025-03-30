@@ -7,6 +7,10 @@ import (
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/share"
 	"github.com/spf13/cobra"
+
+	_ "github.com/sjzsdu/wn/llm/providers/claude"
+	_ "github.com/sjzsdu/wn/llm/providers/deepseek"
+	_ "github.com/sjzsdu/wn/llm/providers/openai"
 )
 
 var (

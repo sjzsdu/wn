@@ -19,3 +19,5 @@ const MAX_TOKENS = 8192
 const CACHE_TYPE = "json"
 
 const NOT_PROGRAM_TIP = "This is not a program file."
+
+const DEFAULT_RENDERER = "markdown"

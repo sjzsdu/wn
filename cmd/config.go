@@ -16,7 +16,18 @@ var configCmd = &cobra.Command{
 }
 
 var (
-	flagKeys = []string{"lang", "default_provider", "default_agent", "deepseek_apikey", "deepseek_model", "openai_apikey", "openai_model", "claude_apikey", "claude_model"}
+	flagKeys = map[string]string{
+		"lang":             "Set language",
+		"render":           "Set llm response render type",
+		"default_provider": "Set default LLM provider",
+		"default_agent":    "Set default agent",
+		"deepseek_apikey":  "Set DeepSeek API Key",
+		"deepseek_model":   "Set DeepSeek default model",
+		"openai_apikey":    "Set Openai API Key",
+		"openai_model":     "Set Openai default model",
+		"claude_apikey":    "Set Claude API Key",
+		"claude_model":     "Set Claude default model",
+	}
 	listFlag bool
 )
 
@@ -27,16 +38,11 @@ func init() {
 
 	rootCmd.AddCommand(configCmd)
 	configCmd.Flags().BoolVar(&listFlag, "list", false, lang.T("List all configurations"))
-	configCmd.Flags().String("lang", config.GetConfig("lang"), lang.T("Set language"))
-	configCmd.Flags().String("default_provider", config.GetConfig("default_provider"), lang.T("Set default LLM provider"))
-	configCmd.Flags().String("default_agent", config.GetConfig("default_agent"), lang.T("Set default agent"))
 
-	configCmd.Flags().String("deepseek_apikey", config.GetConfig("deepseek_apikey"), lang.T("Set DeepSeek API Key"))
-	configCmd.Flags().String("deepseek_model", config.GetConfig("deepseek_model"), lang.T("Set DeepSeek default model"))
-	configCmd.Flags().String("openai_apikey", config.GetConfig("openai_apikey"), lang.T("Set Openai API Key"))
-	configCmd.Flags().String("openai_model", config.GetConfig("openai_model"), lang.T("Set Openai default model"))
-	configCmd.Flags().String("claude_apikey", config.GetConfig("claude_apikey"), lang.T("Set Claude API Key"))
-	configCmd.Flags().String("claude_model", config.GetConfig("claude_model"), lang.T("Set Claude default model"))
+	// 通过遍历 flagKeys 自动添加所有配置项
+	for key, desc := range flagKeys {
+		configCmd.Flags().String(key, config.GetConfig(key), lang.T(desc))
+	}
 }
 
 func runConfig(cmd *cobra.Command, args []string) {
@@ -47,7 +53,7 @@ func runConfig(cmd *cobra.Command, args []string) {
 
 	if listFlag {
 		fmt.Println(lang.T("Current configurations:"))
-		for _, key := range flagKeys {
+		for key := range flagKeys {
 			value := config.GetConfig(key)
 			if value != "" {
 				fmt.Printf("%s=%s\n", config.GetEnvKey(key), value)
@@ -58,7 +64,7 @@ func runConfig(cmd *cobra.Command, args []string) {
 
 	configChanged := false
 	// 处理 flagKeys 中的标准配置项
-	for _, key := range flagKeys {
+	for key := range flagKeys {
 		flag := cmd.Flag(key)
 		if flag != nil && flag.Changed {
 			value, _ := cmd.Flags().GetString(key)

@@ -8,16 +8,13 @@ import (
 
 	"github.com/sjzsdu/wn/agent"
 	"github.com/sjzsdu/wn/helper"
+	"github.com/sjzsdu/wn/helper/renders"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/message"
 	"github.com/sjzsdu/wn/share"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
-
-	_ "github.com/sjzsdu/wn/llm/providers/claude"
-	_ "github.com/sjzsdu/wn/llm/providers/deepseek"
-	_ "github.com/sjzsdu/wn/llm/providers/openai"
 )
 
 const (
@@ -34,12 +31,13 @@ type aiCommand struct {
 	listProviders bool
 	listModels    bool
 	useAgent      string
+	renderer      renders.Renderer // 使用我们自己定义的 Renderer 接口
 }
 
-// 创建新的命令实例
 func newAICommand() *aiCommand {
 	cmd := &aiCommand{
 		msgManager: message.New(),
+		renderer:   helper.GetDefaultRenderer(),
 	}
 
 	cmd.cmd = &cobra.Command{
@@ -253,9 +251,14 @@ func (c *aiCommand) handleStreamResponse(resp llm.StreamResponse, responseStarte
 		<-loadingDone
 	}
 	if !resp.Done {
-		fmt.Print(resp.Content)
 		fullContent.WriteString(resp.Content)
+		if err := c.renderer.WriteStream(resp.Content); err != nil {
+			// 如果渲染失败，退回到普通输出
+			fmt.Print(resp.Content)
+		}
 	} else {
+		// 完成时，清空缓冲区并添加到消息历史
+		c.renderer.Done()
 		c.msgManager.Append(llm.Message{
 			Role:    "assistant",
 			Content: fullContent.String(),
