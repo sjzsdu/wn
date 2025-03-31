@@ -2,6 +2,7 @@ package wnmcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -26,16 +27,18 @@ func NewClient(conn client.MCPClient, project *project.Project) *Client {
 	return client
 }
 
-func (c *Client) Initialize() {
+func (c *Client) Initialize() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// 初始化客户端并打印服务器信息
 	initResult, err := c.conn.Initialize(ctx, NewInitializeRequest())
 	if err != nil {
-		log.Fatalf("初始化失败: %v", err)
+		log.Printf("初始化失败: %v", err)
+		return err
 	}
 	fmt.Printf("连接到服务器: %s %s\n\n", initResult.ServerInfo.Name, initResult.ServerInfo.Version)
+	return nil
 }
 
 func (c *Client) Ping() error {
@@ -45,14 +48,15 @@ func (c *Client) Ping() error {
 }
 
 func (c *Client) ListResources() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	fmt.Println("Listing available resources...")
 	resourcesRequest := mcp.ListResourcesRequest{}
 	resources, err := c.conn.ListResources(ctx, resourcesRequest)
 	if err != nil {
-		log.Fatalf("Failed to list resources: %v", err)
+		log.Printf("Failed to list resources: %v", err)
+		return err
 	}
 	for _, resource := range resources.Resources {
 		fmt.Printf("资源: %s\n", resource.URI)
@@ -66,6 +70,31 @@ func (c *Client) ListResources() error {
 	return err
 }
 
+func (c *Client) ReadResources() []string {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	// 尝试读取文件列表
+	var files []string
+	fmt.Println("=== 项目文件列表 ===")
+	fileList, err := c.conn.ReadResource(ctx, NewReadResourceRequest("files://"+c.project.GetName(), nil))
+	if err != nil {
+		log.Printf("读取文件列表失败: %v\n", err)
+	} else {
+		for _, content := range fileList.Contents {
+			if textContent, ok := content.(mcp.TextResourceContents); ok {
+				if err := json.Unmarshal([]byte(textContent.Text), &files); err != nil {
+					log.Printf("解析文件列表失败: %v\n", err)
+				} else {
+					for _, file := range files {
+						fmt.Printf("- %s\n", file)
+					}
+				}
+			}
+		}
+	}
+	return files
+}
+
 func (c *Client) ListResourceTemplates() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -74,7 +103,8 @@ func (c *Client) ListResourceTemplates() error {
 	request := mcp.ListResourceTemplatesRequest{}
 	result, err := c.conn.ListResourceTemplates(ctx, request)
 	if err != nil {
-		log.Fatalf("获取资源模板失败: %v", err)
+		log.Printf("获取资源模板失败: %v", err)
+		return err
 	}
 	for _, template := range result.ResourceTemplates {
 		fmt.Printf("名称: %s\n", template.Name)
@@ -94,11 +124,13 @@ func (c *Client) ReadResource(uri string, args map[string]interface{}) error {
 	defer cancel()
 
 	fmt.Printf("读取资源: %s\n", uri)
+	fmt.Printf("source: %s\n", c.project.GetName()+":///"+uri)
 
-	request := NewReadResourceRequest(uri, args)
+	request := NewReadResourceRequest(c.project.GetName()+"://"+uri, args)
 	result, err := c.conn.ReadResource(ctx, request)
 	if err != nil {
-		log.Fatalf("读取资源失败: %v", err)
+		log.Printf("读取资源失败: %v", err)
+		return err
 	}
 	fmt.Printf("资源内容Meta:\n%v\n", result.Meta)
 	fmt.Printf("资源内容:\n%v\n", result.Contents)
@@ -113,7 +145,8 @@ func (c *Client) ListPrompts() error {
 	request := mcp.ListPromptsRequest{}
 	result, err := c.conn.ListPrompts(ctx, request)
 	if err != nil {
-		log.Fatalf("获取提示列表失败: %v", err)
+		fmt.Printf("获取提示列表失败: %v\n", err)
+		return err
 	}
 	for _, prompt := range result.Prompts {
 		fmt.Printf("arguments: %v\n", prompt.Arguments)
@@ -134,7 +167,8 @@ func (c *Client) GetPrompt(name string, args map[string]string) error {
 	request := NewPromptRequest(name, args)
 	result, err := c.conn.GetPrompt(ctx, request)
 	if err != nil {
-		log.Fatalf("获取提示失败: %v", err)
+		log.Printf("获取提示失败: %v", err)
+		return err
 	}
 	fmt.Printf("提示内容:\n%s\n", result.Description)
 	fmt.Printf("提示内容:\n%v\n", result.Messages)
@@ -150,15 +184,17 @@ func (c *Client) ListTools() error {
 	request := mcp.ListToolsRequest{}
 	result, err := c.conn.ListTools(ctx, request)
 	if err != nil {
-		log.Fatalf("获取工具列表失败: %v", err)
+		log.Printf("获取工具列表失败: %v", err)
+		return err
 	}
 	for _, tool := range result.Tools {
 		fmt.Printf("名称: %s\n", tool.Name)
 		if tool.Description != "" {
 			fmt.Printf("描述: %s\n", tool.Description)
 		}
-		fmt.Printf("InputSchema: %s\n", tool.InputSchema)
-		fmt.Printf("Type: %s\n", tool.InputSchema.Type)
+		fmt.Printf("RawInputSchema: %s\n", tool.RawInputSchema)
+		fmt.Printf("InputSchema: %v\n", tool.InputSchema)
+		fmt.Printf("Properties: %v\n", tool.InputSchema.Properties)
 		fmt.Println()
 	}
 	return err
@@ -172,7 +208,8 @@ func (c *Client) CallTool(name string, args map[string]interface{}) error {
 	request := NewToolCallRequest(name, args)
 	result, err := c.conn.CallTool(ctx, request)
 	if err != nil {
-		log.Fatalf("工具调用失败: %v", err)
+		log.Printf("工具调用失败: %v", err)
+		return err
 	}
 	fmt.Printf("执行结果:\n%s\n", result.Content)
 	fmt.Printf("执行结果:\n%v\n", result.Meta)

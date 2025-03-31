@@ -22,6 +22,7 @@ var (
 	mcpEnv     []string
 	mcpArgs    []string
 	mcpAction  string
+	sourceUrl  string
 )
 
 var mcpCmd = &cobra.Command{
@@ -56,6 +57,7 @@ func init() {
 	mcpClientCmd.PersistentFlags().StringSliceVar(&mcpEnv, "env", nil, lang.T("MCP server environtment"))
 	mcpClientCmd.PersistentFlags().StringSliceVar(&mcpArgs, "args", nil, lang.T("MCP server command arguments"))
 	mcpClientCmd.PersistentFlags().StringVar(&mcpAction, "action", "", lang.T("MCP server command arguments"))
+	mcpClientCmd.PersistentFlags().StringVar(&sourceUrl, "path", "", lang.T("Source URL"))
 }
 
 func runMcpServer(cmd *cobra.Command, args []string) {
@@ -79,6 +81,7 @@ func runMcpServer(cmd *cobra.Command, args []string) {
 	}
 	servers.NewResource(project)
 	servers.NewTool(project)
+	servers.NewPrompt(project)
 
 	fmt.Printf("Starting MCP server at %s...\n", targetPath)
 
@@ -131,6 +134,12 @@ func runMcpClient(cmd *cobra.Command, args []string) {
 	wnClient.Ping()
 
 	// 列出所有资源模板
+	wnClient.ListResources()
+	wnClient.ReadResources()
+	if sourceUrl != "" {
+		wnClient.ReadResource(sourceUrl, map[string]interface{}{})
+	}
+
 	wnClient.ListResourceTemplates()
 
 	// 列出所有提示
