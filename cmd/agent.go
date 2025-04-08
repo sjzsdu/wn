@@ -1,12 +1,11 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/sjzsdu/wn/agent"
+	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/spf13/cobra"
 )
@@ -60,22 +59,8 @@ func runAgent(cmd *cobra.Command, args []string) {
 			return content
 		}
 
-		// 从标准输入读取，使用空行作为结束标记
-		fmt.Println(lang.T("Please input content, input an empty line to finish:"))
-		var lines []string
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if line == "" {
-				break
-			}
-			lines = append(lines, line)
-		}
-		if err := scanner.Err(); err != nil {
-			fmt.Printf(lang.T("Failed to read input: %v\n"), err)
-			return ""
-		}
-		return strings.Join(lines, "\n")
+		input, _ := helper.InputString("> ")
+		return input
 	}
 
 	if createAgent != "" {

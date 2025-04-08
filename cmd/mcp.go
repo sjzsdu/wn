@@ -138,6 +138,11 @@ func runMcpClient(cmd *cobra.Command, args []string) {
 	wnClient.ReadResources()
 	if sourceUrl != "" {
 		wnClient.ReadResource(sourceUrl, map[string]interface{}{})
+
+		// 调用 readFile 工具读取文件内容
+		wnClient.CallTool("readFile", map[string]interface{}{
+			"path": sourceUrl,
+		})
 	}
 
 	wnClient.ListResourceTemplates()

@@ -46,7 +46,7 @@ func ReadFromTerminal(promptText string) (string, error) {
 		func(d prompt.Document) []prompt.Suggest {
 			return nil
 		},
-		prompt.OptionPrefix(""),  // 移除默认提示符
+		prompt.OptionPrefix(""), // 移除默认提示符
 		prompt.OptionTitle("wn"),
 		prompt.OptionPrefixTextColor(prompt.Blue),
 		prompt.OptionInputTextColor(prompt.DefaultColor),
@@ -73,7 +73,7 @@ func ReadFromTerminal(promptText string) (string, error) {
 
 	// 手动输出提示符
 	fmt.Print(promptText)
-	
+
 	go p.Run()
 	<-done
 
@@ -117,4 +117,26 @@ func ReadFromVim() (string, error) {
 	userInput := strings.TrimSpace(string(content))
 
 	return userInput, nil
+}
+
+func InputString(promptText string) (string, error) {
+	input, err := ReadFromTerminal(promptText)
+	if err != nil {
+		return "", fmt.Errorf("error reading input: %w", err)
+	}
+
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return "", fmt.Errorf("empty input")
+	}
+
+	if input == "vim" {
+		input, err = ReadFromVim()
+		if err != nil {
+			return "", fmt.Errorf(lang.T("Error reading vim")+": %v\n", err)
+		}
+		fmt.Printf(">%s\n", input)
+	}
+
+	return input, nil
 }

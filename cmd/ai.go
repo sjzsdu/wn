@@ -131,7 +131,7 @@ func (c *aiCommand) startInteractiveChat(ctx context.Context, provider llm.Provi
 	}
 
 	for {
-		input, err := helper.ReadFromTerminal("> ")
+		input, err := helper.InputString("> ")
 		if err != nil {
 			fmt.Printf(lang.T("Error reading input")+": %v\n", err)
 			continue
@@ -150,16 +150,6 @@ func (c *aiCommand) startInteractiveChat(ctx context.Context, provider llm.Provi
 		case "quit", "q":
 			fmt.Println(lang.T("Chat session terminated, thanks for using!"))
 			return
-		}
-
-		if input == "vim" {
-			input, err = helper.ReadFromVim()
-			if err != nil {
-				fmt.Printf(lang.T("Error reading vim")+": %v\n", err)
-				continue
-			} else {
-				fmt.Printf(">%s\n", input)
-			}
 		}
 
 		if inDebug {

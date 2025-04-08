@@ -44,6 +44,10 @@ func runproject(cmd *cobra.Command, args []string) {
 	traverser := project.NewBaseChatter(doc)
 	traverser.ChatWithLLM()
 	data := doc.GetLLMResponse()
+	if data == "" {
+		fmt.Printf("failed to get llm response: %v\n", err)
+		return
+	}
 
 	// 创建 AI 命令实例并设置消息
 	aiCmd := newAICommand()
