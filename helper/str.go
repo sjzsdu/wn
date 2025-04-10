@@ -33,3 +33,21 @@ func randomString(length int) string {
 	}
 	return string(result)
 }
+
+func StripHTMLTags(text string) string {
+	var result strings.Builder
+	var inTag bool
+
+	for _, r := range text {
+		switch {
+		case r == '<':
+			inTag = true
+		case r == '>':
+			inTag = false
+		case !inTag:
+			result.WriteRune(r)
+		}
+	}
+
+	return strings.TrimSpace(result.String())
+}

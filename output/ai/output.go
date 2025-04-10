@@ -11,6 +11,8 @@ import (
 	"github.com/gomarkdown/markdown/parser"
 	"github.com/jung-kurt/gofpdf"
 	"github.com/sjzsdu/wn/helper"
+	"github.com/gomarkdown/markdown/html"
+	"bytes"
 )
 
 func Output(output string, messages []llm.Message) error {
@@ -70,6 +72,7 @@ type Conversation struct {
 
 func toPDF(conversations []Conversation) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.SetAutoPageBreak(true, 10)  // 添加自动分页设置
 	
 	// 使用嵌入式字体
 	fontPath, err := helper.UseEmbeddedFont("")
@@ -87,16 +90,13 @@ func toPDF(conversations []Conversation) ([]byte, error) {
 
 	// 添加字体
 	pdf.AddUTF8FontFromBytes(fontName, "", fontData)
-	pdf.SetFont(fontName, "", 11)
+	pdf.SetFont(fontName, "", 12)  // 修改默认字体大小为 12
 	
 	// 添加标题页
 	pdf.AddPage()
 	pdf.SetFont(fontName, "", 24)
 	pdf.Cell(190, 10, "AI 对话记录")
 	pdf.Ln(20)
-	
-	// 设置正文字体
-	pdf.SetFont(fontName, "", 11)
 	
 	for i, conv := range conversations {
 		if i > 0 {
@@ -105,7 +105,7 @@ func toPDF(conversations []Conversation) ([]byte, error) {
 		
 		// 添加角色标题
 		pdf.SetFont(fontName, "", 16)
-		pdf.SetTextColor(0, 102, 204) // 蓝色
+		pdf.SetTextColor(0, 102, 204)
 		pdf.CellFormat(190, 10, strings.Title(conv.Role), "", 1, "L", false, 0, "")
 		pdf.Ln(5)
 		
@@ -119,22 +119,28 @@ func toPDF(conversations []Conversation) ([]byte, error) {
 		md := []byte(conv.Content)
 		doc := markdown.Parse(md, p)
 		
-		// 将解析后的内容转换为纯文本
-		text := string(markdown.Render(doc, markdown.NewPlainRenderer()))
+		// 配置 HTML 渲染器
+		htmlFlags := html.CommonFlags | html.HrefTargetBlank
+		opts := html.RendererOptions{Flags: htmlFlags}
+		renderer := html.NewRenderer(opts)
 		
-		// 清理文本
+		// 渲染为纯文本
+		text := string(markdown.Render(doc, renderer))
 		text = cleanText(text)
+		
+		// 移除 HTML 标签
+		text = helper.StripHTMLTags(text)
 		
 		// 分段显示内容
 		lines := strings.Split(text, "\n")
 		for _, line := range lines {
-			if strings.TrimSpace(line) != "" {
+			line = strings.TrimSpace(line)
+			if line != "" {
 				pdf.MultiCell(190, 5, line, "", "L", false)
 				pdf.Ln(2)
 			}
 		}
 		
-		// 添加分隔线
 		if i < len(conversations)-1 {
 			pdf.Ln(5)
 			pdf.SetDrawColor(200, 200, 200)
@@ -144,7 +150,12 @@ func toPDF(conversations []Conversation) ([]byte, error) {
 	}
 	
 	// 将 PDF 转换为字节数组
-	return pdf.Output(nil)
+	var buf bytes.Buffer
+	err = pdf.Output(&buf)
+	if err != nil {
+		return nil, fmt.Errorf("生成 PDF 失败: %v", err)
+	}
+	return buf.Bytes(), nil
 }
 
 // 添加辅助函数用于清理文本

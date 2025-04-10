@@ -78,7 +78,10 @@ func TestOutput(t *testing.T) {
 			name:     "PDF格式输出",
 			output:   filepath.Join(tempDir, "test.pdf"),
 			messages: testMessages,
-			wantErr:  true, // 因为 PDF 功能还未实现
+			wantErr:  false,  // 改为 false，因为 PDF 功能已实现
+			checkOutput: func(t *testing.T, content []byte) {
+				assert.NotEmpty(t, content)  // PDF 内容不应为空
+			},
 		},
 		{
 			name:     "创建嵌套目录",
@@ -147,8 +150,8 @@ func TestConversionFunctions(t *testing.T) {
 	})
 
 	t.Run("toPDF", func(t *testing.T) {
-		_, err := toPDF(conversations)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "PDF format not implemented yet")
+		content, err := toPDF(conversations)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, content)
 	})
 }
