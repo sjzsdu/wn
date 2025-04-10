@@ -12,6 +12,7 @@ import (
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/message"
+	"github.com/sjzsdu/wn/output/ai"
 	"github.com/sjzsdu/wn/share"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
@@ -149,6 +150,9 @@ func (c *aiCommand) startInteractiveChat(ctx context.Context, provider llm.Provi
 			return
 		case "quit", "q":
 			fmt.Println(lang.T("Chat session terminated, thanks for using!"))
+			if output != "" {
+				ai.Output(output, c.msgManager.GetAll())
+			}
 			return
 		}
 
