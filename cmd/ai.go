@@ -150,9 +150,6 @@ func (c *aiCommand) startInteractiveChat(ctx context.Context, provider llm.Provi
 			return
 		case "quit", "q":
 			fmt.Println(lang.T("Chat session terminated, thanks for using!"))
-			if output != "" {
-				ai.Output(output, c.msgManager.GetAll())
-			}
 			return
 		}
 
@@ -170,6 +167,10 @@ func (c *aiCommand) startInteractiveChat(ctx context.Context, provider llm.Provi
 				return
 			}
 			continue
+		}
+
+		if output != "" {
+			ai.Output(output, c.msgManager.GetAll())
 		}
 	}
 }
