@@ -1,7 +1,7 @@
 site_name: WN CLI Documentation
 site_url: https://sjzsdu.github.io/wn/  # 添加站点 URL
 site_description: WN CLI tool documentation
-site_author: Trae
+site_author: Juzhong Sun
 
 theme:
   name: material
@@ -54,6 +54,10 @@ nav:
       - Pack: pack.md
       - Static: static.md
       - Version: version.md
+      - MCP:
+        - 概述: mcp.md
+        - 服务端: mcp_server.md
+        - 客户端: mcp_client.md
   - en:
     - Home: index.md
     - Commands:
@@ -70,6 +74,10 @@ nav:
       - Pack: pack.md
       - Static: static.md
       - Version: version.md
+      - MCP:
+        - Overview: mcp.md
+        - Server: mcp_server.md
+        - Client: mcp_client.md
 
 # GitHub Pages 相关配置
 repo_name: sjzsdu/wn
