@@ -56,8 +56,8 @@ nav:
       - Version: version.md
       - MCP:
         - 概述: mcp.md
-        - 服务端: mcp_server.md
-        - 客户端: mcp_client.md
+        - 服务端: server.md
+        - 客户端: client.md
   - en:
     - Home: index.md
     - Commands:
@@ -76,8 +76,8 @@ nav:
       - Version: version.md
       - MCP:
         - Overview: mcp.md
-        - Server: mcp_server.md
-        - Client: mcp_client.md
+        - Server: server.md
+        - Client: client.md
 
 # GitHub Pages 相关配置
 repo_name: sjzsdu/wn
