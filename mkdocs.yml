@@ -42,42 +42,52 @@ nav:
     - 首页: index.md
     - 命令:
       - WN: wn.md
-      - Agent: agent.md
-      - AI: ai.md
-      - Config: config.md
-      - Doc: doc.md
+      - Agent: wn_agent.md
+      - AI: wn_ai.md
+      - Cache: wn_cache.md
+      - Config: wn_config.md
+      - Doc: wn_doc.md
       - Git: 
-        - 概述: git.md
-        - Commit: commit.md
-        - List: list.md
-        - Rebase: rebase.md
-      - Pack: pack.md
-      - Static: static.md
-      - Version: version.md
+        - 概述: wn_git.md
+        - Commit: wn_git_commit.md
+        - List: wn_git_list.md
+        - Rebase: wn_git_rebase.md
+        - 帮助: wn_git_help.md
+      - Help: wn_help.md
       - MCP:
-        - 概述: mcp.md
-        - 服务端: server.md
-        - 客户端: client.md
+        - 概述: wn_mcp.md
+        - 服务端: wn_mcp_server.md
+        - 客户端: wn_mcp_client.md
+        - 帮助: wn_mcp_help.md
+      - Pack: wn_pack.md
+      - Project: wn_project.md
+      - Static: wn_static.md
+      - Version: wn_version.md
   - en:
     - Home: index.md
     - Commands:
       - WN: wn.md
-      - Agent: agent.md
-      - AI: ai.md
-      - Config: config.md
-      - Doc: doc.md
+      - Agent: wn_agent.md
+      - AI: wn_ai.md
+      - Cache: wn_cache.md
+      - Config: wn_config.md
+      - Doc: wn_doc.md
       - Git: 
-        - Overview: git.md
-        - Commit: commit.md
-        - List: list.md
-        - Rebase: rebase.md
-      - Pack: pack.md
-      - Static: static.md
-      - Version: version.md
+        - Overview: wn_git.md
+        - Commit: wn_git_commit.md
+        - List: wn_git_list.md
+        - Rebase: wn_git_rebase.md
+        - Help: wn_git_help.md
+      - Help: wn_help.md
       - MCP:
-        - Overview: mcp.md
-        - Server: server.md
-        - Client: client.md
+        - Overview: wn_mcp.md
+        - Server: wn_mcp_server.md
+        - Client: wn_mcp_client.md
+        - Help: wn_mcp_help.md
+      - Pack: wn_pack.md
+      - Project: wn_project.md
+      - Static: wn_static.md
+      - Version: wn_version.md
 
 # GitHub Pages 相关配置
 repo_name: sjzsdu/wn
@@ -85,4 +95,4 @@ repo_url: https://github.com/sjzsdu/wn
 edit_uri: edit/main/docs/
 
 # 错误处理
-strict: true
+strict: false

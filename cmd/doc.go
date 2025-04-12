@@ -40,12 +40,18 @@ The documentation will be generated in Markdown format and saved in the docs dir
 		zhRootCmd := *rootCmd
 		updateCommandsLocalization(&zhRootCmd)
 
-		// 复制 README.md 作为中文文档索引
+		// 复制并修改 README.md 作为中文文档索引
 		readmeContent, err := os.ReadFile("README.md")
 		if err != nil {
 			fmt.Printf("Failed to read README.md: %v\n", err)
 			return
 		}
+		// 替换语言切换链接
+		readmeContent = bytes.ReplaceAll(
+			readmeContent,
+			[]byte(`中文 | [English](README.en.md)`),
+			[]byte(``),
+		)
 		if err := os.WriteFile("./docs/zh/index.md", readmeContent, 0644); err != nil {
 			fmt.Printf("Failed to create Chinese index.md: %v\n", err)
 			return
@@ -67,14 +73,13 @@ The documentation will be generated in Markdown format and saved in the docs dir
 			fmt.Printf("Failed to read README.en.md: %v\n", err)
 			return
 		}
+		// 替换语言切换链接
+		readmeEnContent = bytes.ReplaceAll(
+			readmeEnContent,
+			[]byte(`English | [中文](README.md)`),
+			[]byte(``),
+		)
 		if err := os.WriteFile("./docs/en/index.md", readmeEnContent, 0644); err != nil {
-			fmt.Printf("Failed to create English index.md: %v\n", err)
-			return
-		}
-
-		// 生成英文索引
-		indexEn := "# WN CLI Documentation\n\nWelcome to WN CLI documentation."
-		if err := os.WriteFile("./docs/en/index.md", []byte(indexEn), 0644); err != nil {
 			fmt.Printf("Failed to create English index.md: %v\n", err)
 			return
 		}
@@ -151,8 +156,48 @@ func getDetailedDescription(cmd *cobra.Command) string {
 	return cmd.Short
 }
 
+// 修改文件名生成规则
+func generateDocFilename(cmd *cobra.Command) string {
+	parent := cmd.Parent()
+
+	// 如果是根命令(wn)，直接返回 wn
+	if parent == nil {
+		return "wn"
+	}
+
+	// 如果父命令是根命令，添加 wn_ 前缀
+	if parent.Name() == "wn" {
+		return "wn_" + cmd.Name()
+	}
+
+	// 对于二级及以上子命令，使用 wn_parent_command 格式
+	return fmt.Sprintf("wn_%s_%s", parent.Name(), cmd.Name())
+}
+
+// 修改链接处理函数
+func fixLinks(content []byte) []byte {
+	// 修复指向根命令的链接，确保使用 wn.md
+	content = bytes.ReplaceAll(
+		content,
+		[]byte(`* [wn](wn_wn.md)`),
+		[]byte(`* [wn](wn.md)`),
+	)
+
+	// 修复其他链接
+	content = bytes.ReplaceAll(
+		content,
+		[]byte(`[wn](wn_wn.md)`),
+		[]byte(`[wn](wn.md)`),
+	)
+
+	return content
+}
+
 // 修改模板处理函数
 func generateDocWithTemplate(cmd *cobra.Command, langCode string) error {
+	filename := generateDocFilename(cmd)
+	outputPath := filepath.Join("docs", langCode, filename+".md")
+
 	// 获取模板文件
 	templatePath := filepath.Join("templates", "docs", langCode, cmd.Name()+".tmpl")
 	if _, err := os.Stat(templatePath); err == nil {
@@ -177,17 +222,20 @@ func generateDocWithTemplate(cmd *cobra.Command, langCode string) error {
 			return err
 		}
 
-		// 写入生成的文档
-		outputPath := filepath.Join("docs", langCode, cmd.Name()+".md")
-		return os.WriteFile(outputPath, buf.Bytes(), 0644)
+		// 修复链接并写入文件
+		fixedContent := fixLinks(buf.Bytes())
+		return os.WriteFile(outputPath, fixedContent, 0644)
 	}
 
-	// 如果没有模板，使用默认的 cobra 文档生成
-	outputPath := filepath.Join("docs", langCode, cmd.Name()+".md")
-	f, err := os.Create(outputPath)
-	if err != nil {
+	// 如果没有模板，使用临时缓冲区生成文档
+	var buf bytes.Buffer
+	if err := doc.GenMarkdown(cmd, &buf); err != nil {
 		return err
 	}
-	defer f.Close()
-	return doc.GenMarkdown(cmd, f)
+
+	// 修复链接
+	fixedContent := fixLinks(buf.Bytes())
+
+	// 创建输出文件并写入内容
+	return os.WriteFile(outputPath, fixedContent, 0644)
 }

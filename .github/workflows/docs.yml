@@ -42,37 +42,6 @@ jobs:
           go run main.go doc
           ls -la docs/
           
-      - name: Fix doc links
-        run: |
-          cd docs
-          for lang in zh en; do
-            cd $lang
-            for file in *.md; do
-              if [ -f "$file" ]; then
-                sed -i 's/wn_//g' "$file"
-                sed -i 's/git_\([a-z]*\).md/\1.md/g' "$file"
-              fi
-            done
-            # 修复语言切换链接
-            if [ "$lang" = "zh" ]; then
-              sed -i 's/README.en.md/\/en\//g' index.md
-            fi
-            cd ..
-          done
-          
-      - name: Clean doc filenames
-        run: |
-          cd docs
-          for lang in zh en; do
-            cd $lang
-            for file in wn_*.md; do
-              if [ -f "$file" ]; then
-                mv "$file" "${file#wn_}"
-              fi
-            done
-            cd ..
-          done
-          
       - name: Check docs generation
         run: |
           if [ ! -f "docs/zh/index.md" ] || [ ! -f "docs/en/index.md" ]; then

@@ -1,6 +1,6 @@
 # WN - Multi-functional Command Line Tool
 
-[中文](README.md) | English
+English | [中文](README.md)
 
 ## Overview
 WN is a multi-functional command line tool that provides practical features such as file packaging and code statistics to help developers manage and analyze code more efficiently.
