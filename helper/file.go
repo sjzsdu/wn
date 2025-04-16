@@ -431,3 +431,21 @@ func GetFileExt(file string) string {
 	}
 	return ext[1:]
 }
+
+func GetFileContent(file string) (string, error) {
+	// Get the absolute path of the file
+	absPath, err := GetAbsPath(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %v", err)
+	}
+
+	// Read the content from the file
+	fileContent, err := os.ReadFile(absPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %v", err)
+	}
+
+	// Return the file content as a string
+	return string(fileContent), nil
+}
+

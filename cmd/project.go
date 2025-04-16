@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/sjzsdu/wn/aigc"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
@@ -41,29 +43,43 @@ func runproject(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// 获取项目分析结果
 	traverser := project.NewBaseChatter(doc)
 	traverser.ChatWithLLM()
 	data := doc.GetLLMResponse()
 	if data == "" {
-		fmt.Printf("failed to get llm response: %v\n", err)
+		fmt.Printf("failed to get llm response\n")
 		return
 	}
 
-	// 创建 AI 命令实例并设置消息
-	aiCmd := newAICommand()
-	aiCmd.SetMessage([]llm.Message{
+	// 创建聊天实例
+	chat, err := aigc.NewChat(aigc.ChatOptions{
+		ProviderName: "", // 使用默认 provider
+		Model:        "", // 使用默认 model
+		MaxTokens:    0,  // 使用默认 token 限制
+		UseAgent:     "project",
+		MessageLimit: MaxRecentMessages,
+	})
+	if err != nil {
+		fmt.Printf("failed to initialize chat: %v\n", err)
+		return
+	}
+
+	// 设置初始消息
+	chat.SetMessages([]llm.Message{
 		{
 			Role:    "user",
 			Content: data,
 		},
-	}).SetAgent("project")
-	// 获取默认的 provider
-	provider, err := llm.GetProvider("", nil)
-	if err != nil {
-		fmt.Printf("failed to get provider: %v\n", err)
-		return
-	}
+	})
 
-	// 直接开始聊天
-	aiCmd.startChat(provider)
+	// 启动交互式会话
+	ctx := context.Background()
+	err = chat.StartInteractiveSession(ctx, aigc.InteractiveOptions{
+		Renderer: helper.GetDefaultRenderer(),
+		Debug:    false,
+	})
+	if err != nil {
+		fmt.Printf("chat session ended with error: %v\n", err)
+	}
 }
