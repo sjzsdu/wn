@@ -18,7 +18,7 @@ type Hooks struct {
 	// 接收响应后的钩子
 	AfterResponse func(ctx context.Context, resp string) error
 	// 获取上下文消息时的钩子
-	BeforeGetContext func(ctx context.Context, messages []llm.Message) []llm.Message
+	BeforeGetContext func(ctx context.Context, agentMessages []llm.Message, historyMessages []llm.Message) []llm.Message
 }
 
 // ChatOptions 配置聊天选项

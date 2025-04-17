@@ -1,0 +1,181 @@
+package helper
+
+import (
+	"crypto/md5"
+	"encoding/hex"
+	"fmt"
+	"html/template"
+	"net/http"
+	"os/exec"
+	"sync"
+)
+
+var (
+	content   string
+	contentMu sync.RWMutex
+	server    *http.Server
+	etag      string // Add etag variable
+)
+
+const htmlTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog Preview</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.2.0/github-markdown.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+            min-width: 200px;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 45px;
+            background-color: #f6f8fa;
+        }
+        .markdown-body {
+            background-color: white;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+        pre {
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="markdown-body" id="content"></div>
+    <script>
+        // 初始化 Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose'
+        });
+
+        // 渲染内容
+        function renderContent(markdown) {
+            const contentDiv = document.getElementById('content');
+            
+            // 渲染 Markdown
+            contentDiv.innerHTML = marked.parse(markdown);
+            
+            // 处理 Mermaid 图表
+            contentDiv.querySelectorAll('code.language-mermaid').forEach(code => {
+                const pre = code.parentElement;
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = code.textContent;
+                pre.parentElement.replaceChild(div, pre);
+            });
+
+            // 重新初始化 Mermaid
+            mermaid.init();
+        }
+
+        // 自动刷新内容
+        function refreshContent() {
+            fetch('/content', {
+                headers: {
+                    'If-None-Match': window.lastContent || ''
+                }
+            })
+            .then(response => {
+                if (response.status === 304) {
+                    return;
+                }
+                return response.text();
+            })
+            .then(newContent => {
+                if (newContent) {
+                    window.lastContent = newContent;
+                    renderContent(newContent);
+                }
+            })
+            .catch(error => {
+                console.error('Failed to fetch content:', error);
+            });
+        }
+
+        // 初始化内容
+        refreshContent();
+
+        // 每秒刷新一次
+        setInterval(refreshContent, 1000);
+    </script>
+</body>
+</html>
+`
+
+func StartPreviewServer(port int) string {
+	tmpl := template.Must(template.New("preview").Parse(htmlTemplate))
+
+	// 处理基础 HTML 页面请求
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		tmpl.Execute(w, nil)
+	})
+
+	// 处理内容请求
+	http.HandleFunc("/content", func(w http.ResponseWriter, r *http.Request) {
+		contentMu.RLock()
+		currentContent := content
+		currentEtag := etag
+		contentMu.RUnlock()
+
+		// 检查内容是否有变化
+		if r.Header.Get("If-None-Match") == currentEtag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("ETag", currentEtag)
+		w.Write([]byte(currentContent))
+	})
+
+	server = &http.Server{
+		Addr: fmt.Sprintf(":%d", port),
+	}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Printf("HTTP server error: %v\n", err)
+		}
+	}()
+
+	url := fmt.Sprintf("http://localhost:%d", port)
+	// 在默认浏览器中打开 URL
+	go func() {
+		cmd := exec.Command("open", url)
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("Failed to open browser: %v\n", err)
+		}
+	}()
+	// OSC 8 格式：\033]8;;URL\007TEXT\033]8;;\007
+	return fmt.Sprintf("\033]8;;%s\007%s\033]8;;\007", url, url)
+}
+
+func UpdatePreviewContent(newContent string) {
+	contentMu.Lock()
+	content = newContent
+	// Generate MD5 hash as ETag
+	hash := md5.Sum([]byte(newContent))
+	etag = hex.EncodeToString(hash[:])
+	contentMu.Unlock()
+}
+
+// 添加关闭服务器的函数
+func StopPreviewServer() error {
+	if server != nil {
+		return server.Close()
+	}
+	return nil
+}

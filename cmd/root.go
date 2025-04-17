@@ -60,4 +60,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&gitURL, "git-url", "g", "", lang.T("Git repository URL to clone and pack"))
 	rootCmd.PersistentFlags().BoolVarP(&disableGitIgnore, "disable-gitignore", "i", false, lang.T("Disable .gitignore rules"))
 	rootCmd.PersistentFlags().BoolVarP(&inDebug, "debug", "d", false, lang.T("Debug mode"))
+
+	// 设置全局 debug 模式
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		share.SetDebug(inDebug)
+	}
 }

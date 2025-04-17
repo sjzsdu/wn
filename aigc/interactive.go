@@ -97,6 +97,9 @@ func (c *Chat) processInteraction(ctx context.Context, input string, opts Intera
 				}
 			} else {
 				opts.Renderer.Done()
+				if c.options.Hooks.AfterResponse != nil {
+					c.options.Hooks.AfterResponse(ctx, fullContent.String())
+				}
 				c.msgManager.Append(llm.Message{
 					Role:    "assistant",
 					Content: fullContent.String(),

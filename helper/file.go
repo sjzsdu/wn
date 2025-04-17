@@ -432,11 +432,33 @@ func GetFileExt(file string) string {
 	return ext[1:]
 }
 
+// WriteFileContent 将内容写入指定文件
+func WriteFileContent(file string, content string) error {
+	// 获取文件的绝对路径
+	absPath, err := GetAbsPath(file)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %v", err)
+	}
+
+	// 写入内容到文件
+	err = os.WriteFile(absPath, []byte(content), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write file: %v", err)
+	}
+
+	return nil
+}
+
 func GetFileContent(file string) (string, error) {
 	// Get the absolute path of the file
 	absPath, err := GetAbsPath(file)
 	if err != nil {
 		return "", fmt.Errorf("failed to get absolute path: %v", err)
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		return "", nil
 	}
 
 	// Read the content from the file
@@ -448,4 +470,3 @@ func GetFileContent(file string) (string, error) {
 	// Return the file content as a string
 	return string(fileContent), nil
 }
-

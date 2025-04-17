@@ -51,3 +51,11 @@ func StripHTMLTags(text string) string {
 
 	return strings.TrimSpace(result.String())
 }
+
+func SubString(str string, count int) string {
+	runes := []rune(str)
+	if len(runes) > count {
+		return string(runes[:count]) + "..."
+	}
+	return str
+}

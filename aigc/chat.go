@@ -6,8 +6,10 @@ import (
 	"strings"
 
 	"github.com/sjzsdu/wn/agent"
+	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/message"
+	"github.com/sjzsdu/wn/share"
 )
 
 // defaultOptions 返回默认的聊天选项
@@ -38,6 +40,9 @@ func mergeOptions(base, override ChatOptions) ChatOptions {
 	}
 	if override.MessageLimit != 0 {
 		base.MessageLimit = override.MessageLimit
+	}
+	if override.Hooks != nil {
+		base.Hooks = override.Hooks
 	}
 	return base
 }
@@ -124,29 +129,38 @@ func (c *Chat) SendMessage(ctx context.Context, content string) (string, error) 
 }
 
 func (c *Chat) getContextMessages() []llm.Message {
-	messages := append([]llm.Message{}, agent.GetAgentMessages(c.options.UseAgent)...)
-	messages = append(messages, c.msgManager.GetAll()...)
-
-	if len(messages) == 0 {
-		return messages
-	}
-
-	// 如果消息数量超过限制，只取最后几条
-	if len(messages) > c.options.MessageLimit {
-		messages = messages[len(messages)-c.options.MessageLimit:]
-	}
+	agentMessages := agent.GetAgentMessages(c.options.UseAgent)
+	historyMessages := c.msgManager.GetRecentMessages(c.options.MessageLimit)
 
 	// 执行获取上下文钩子
 	if c.options.Hooks.BeforeGetContext != nil {
-		messages = c.options.Hooks.BeforeGetContext(context.Background(), messages)
+		messages := c.options.Hooks.BeforeGetContext(context.Background(), agentMessages, historyMessages)
+		if share.GetDebug() {
+			PrintMessages(messages)
+		}
+		return messages
 	}
-
+	messages := make([]llm.Message, 0, len(agentMessages)+len(historyMessages))
+	messages = append(messages, agentMessages...)
+	messages = append(messages, historyMessages...)
+	if share.GetDebug() {
+		PrintMessages(messages)
+	}
 	return messages
 }
 
 // GetMessages 获取聊天历史
 func (c *Chat) GetMessages() []llm.Message {
 	return c.msgManager.GetAll()
+}
+
+// PrintMessages 打印聊天历史，每条消息内容最多显示20个字符
+func PrintMessages(messages []llm.Message) {
+	fmt.Println("\n=== 聊天历史 ===")
+	for i, msg := range messages {
+		fmt.Printf("%d. [%s] %s\n", i+1, msg.Role, helper.SubString(msg.Content, 40))
+	}
+	fmt.Println("==============")
 }
 
 // SetMessages 设置聊天历史
