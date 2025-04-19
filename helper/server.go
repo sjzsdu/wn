@@ -80,22 +80,24 @@ const htmlTemplate = `
             mermaid.init();
         }
 
+        let lastEtag = '';
+
         // 自动刷新内容
         function refreshContent() {
             fetch('/content', {
                 headers: {
-                    'If-None-Match': window.lastContent || ''
+                    'If-None-Match': lastEtag
                 }
             })
             .then(response => {
                 if (response.status === 304) {
-                    return;
+                    return null;
                 }
+                lastEtag = response.headers.get('ETag') || '';
                 return response.text();
             })
             .then(newContent => {
                 if (newContent) {
-                    window.lastContent = newContent;
                     renderContent(newContent);
                 }
             })
