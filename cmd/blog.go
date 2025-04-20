@@ -28,6 +28,30 @@ func init() {
 	rootCmd.AddCommand(blogCmd)
 }
 
+// parseUpdateOperations 解析响应内容为更新操作数组
+func parseUpdateOperations(resp string) ([]helper.UpdateOperation, error) {
+	resp = strings.TrimSpace(resp)
+	if resp == "" {
+		return nil, nil
+	}
+
+	// 处理被 ```json 包裹的内容
+	if strings.HasPrefix(resp, "```json") {
+		endIndex := strings.LastIndex(resp, "```")
+		if endIndex > 6 { // "```json" 长度为 7
+			resp = strings.TrimSpace(resp[7:endIndex])
+		}
+	}
+
+	var changes []helper.UpdateOperation
+	err := json.Unmarshal([]byte(resp), &changes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	return changes, nil
+}
+
 func runBlog(cmd *cobra.Command, args []string) {
 	if output == "" {
 		fmt.Println("the output paramter is required")
@@ -46,8 +70,8 @@ func runBlog(cmd *cobra.Command, args []string) {
 			fmt.Printf("meta: %s \n", helper.SubString(blogMeta, 40))
 			fmt.Printf("content: %s \n", helper.SubString(blogContent, 40))
 		}
+		helper.UpdatePreviewContent(blogContent)
 	}
-	helper.UpdatePreviewContent(blogContent)
 
 	// 启动预览服务器
 	previewURL := helper.StartPreviewServer(share.SERVER_PORT)
@@ -58,17 +82,15 @@ func runBlog(cmd *cobra.Command, args []string) {
 		UseAgent: "blog",
 		Hooks: &aigc.Hooks{
 			AfterResponse: func(ctx context.Context, resp string) error {
-
-				// 解析 resp 为 []UpdateOperation
-				var changes []helper.UpdateOperation
-				errShal := json.Unmarshal([]byte(resp), &changes)
-				if errShal != nil {
-					fmt.Printf("failed to parse response: %v\n", err)
-					return errShal
+				changes, err := parseUpdateOperations(resp)
+				if err != nil {
+					fmt.Printf("解析响应失败: %v\n", err)
+					return err
 				}
 
-				// 更新全局变量
-				blogContent = helper.ApplyChanges(blogContent, changes)
+				if changes != nil {
+					blogContent = helper.ApplyChanges(blogContent, changes)
+				}
 				helper.UpdatePreviewContent(blogContent)
 				return nil
 			},
