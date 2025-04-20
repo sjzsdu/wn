@@ -1,0 +1,26 @@
+{
+    "mcpServers": {
+        "filesystem": {
+            "disabled": false,
+            "timeout": 60,
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                "/Users/juzhongsun/Codes/gos/wn"
+            ],
+            "transportType": "stdio"
+        },
+        "github.com/modelcontextprotocol/servers/tree/main/src/time": {
+            "autoApprove": [],
+            "disabled": true,
+            "timeout": 60,
+            "command": "uvx",
+            "args": [
+                "mcp-server-time",
+                "--local-timezone=Asia/Shanghai"
+            ],
+            "transportType": "stdio"
+        }
+    }
+}

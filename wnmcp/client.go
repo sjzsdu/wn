@@ -2,216 +2,178 @@ package wnmcp
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"log"
-	"time"
 
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sjzsdu/wn/project"
 )
 
+// ClientOption 定义客户端选项函数类型
+type ClientOption func(*Client)
+
+// Hook 定义钩子函数的接口
+type Hook interface {
+	BeforeRequest(ctx context.Context, method string, args interface{})
+	AfterRequest(ctx context.Context, method string, response interface{}, err error)
+	OnNotification(notification mcp.JSONRPCNotification)
+}
+
 // Client 实现 MCPClient 接口
 type Client struct {
 	conn    client.MCPClient
 	project *project.Project
+	hook    Hook
 }
 
-func NewClient(conn client.MCPClient, project *project.Project) *Client {
+// WithHook 设置客户端钩子
+func WithHook(hook Hook) ClientOption {
+	return func(c *Client) {
+		c.hook = hook
+	}
+}
+
+func NewClient(conn client.MCPClient, project *project.Project, opts ...ClientOption) *Client {
 	client := &Client{
 		conn:    conn,
 		project: project,
 	}
-	client.Initialize()
+
+	// 应用选项
+	for _, opt := range opts {
+		opt(client)
+	}
+
+	client.Initialize(context.Background(), NewInitializeRequest())
 	return client
 }
 
-func (c *Client) Initialize() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// 初始化客户端并打印服务器信息
-	initResult, err := c.conn.Initialize(ctx, NewInitializeRequest())
-	if err != nil {
-		log.Printf("初始化失败: %v", err)
-		return err
+func (c *Client) callHookBefore(ctx context.Context, method string, args interface{}) {
+	if c.hook != nil {
+		c.hook.BeforeRequest(ctx, method, args)
 	}
-	fmt.Printf("连接到服务器: %s %s\n\n", initResult.ServerInfo.Name, initResult.ServerInfo.Version)
-	return nil
 }
 
-func (c *Client) Ping() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	return c.conn.Ping(ctx)
+func (c *Client) callHookAfter(ctx context.Context, method string, response interface{}, err error) {
+	if c.hook != nil {
+		c.hook.AfterRequest(ctx, method, response, err)
+	}
 }
 
-func (c *Client) ListResources() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+// 实现 MCPClient 接口的所有方法
+func (c *Client) Initialize(ctx context.Context, request mcp.InitializeRequest) (*mcp.InitializeResult, error) {
+	c.callHookBefore(ctx, "Initialize", request)
+	result, err := c.conn.Initialize(ctx, request)
+	c.callHookAfter(ctx, "Initialize", result, err)
+	return result, err
+}
 
-	fmt.Println("Listing available resources...")
-	resourcesRequest := mcp.ListResourcesRequest{}
-	resources, err := c.conn.ListResources(ctx, resourcesRequest)
-	if err != nil {
-		log.Printf("Failed to list resources: %v", err)
-		return err
-	}
-	for _, resource := range resources.Resources {
-		fmt.Printf("资源: %s\n", resource.URI)
-		fmt.Printf("名称: %s\n", resource.Name)
-		if resource.Description != "" {
-			fmt.Printf("描述: %s\n", resource.Description)
-		}
-		fmt.Printf("MIME类型: %s\n", resource.MIMEType)
-		fmt.Println()
-	}
+func (c *Client) Ping(ctx context.Context) error {
+	c.callHookBefore(ctx, "Ping", nil)
+	err := c.conn.Ping(ctx)
+	c.callHookAfter(ctx, "Ping", nil, err)
 	return err
 }
 
-func (c *Client) ReadResources() []string {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	// 尝试读取文件列表
-	var files []string
-	fmt.Println("=== 项目文件列表 ===")
-	fileList, err := c.conn.ReadResource(ctx, NewReadResourceRequest("files://"+c.project.GetName(), nil))
-	if err != nil {
-		log.Printf("读取文件列表失败: %v\n", err)
-	} else {
-		for _, content := range fileList.Contents {
-			if textContent, ok := content.(mcp.TextResourceContents); ok {
-				if err := json.Unmarshal([]byte(textContent.Text), &files); err != nil {
-					log.Printf("解析文件列表失败: %v\n", err)
-				} else {
-					for _, file := range files {
-						fmt.Printf("- %s\n", file)
-					}
-				}
+func (c *Client) ListResources(ctx context.Context, request mcp.ListResourcesRequest) (*mcp.ListResourcesResult, error) {
+	c.callHookBefore(ctx, "ListResources", request)
+	result, err := c.conn.ListResources(ctx, request)
+	c.callHookAfter(ctx, "ListResources", result, err)
+	return result, err
+}
+
+func (c *Client) ListResourceTemplates(ctx context.Context, request mcp.ListResourceTemplatesRequest) (*mcp.ListResourceTemplatesResult, error) {
+	c.callHookBefore(ctx, "ListResourceTemplates", request)
+	result, err := c.conn.ListResourceTemplates(ctx, request)
+	c.callHookAfter(ctx, "ListResourceTemplates", result, err)
+	return result, err
+}
+
+func (c *Client) ReadResource(ctx context.Context, request mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+	c.callHookBefore(ctx, "ReadResource", request)
+	result, err := c.conn.ReadResource(ctx, request)
+	c.callHookAfter(ctx, "ReadResource", result, err)
+	return result, err
+}
+
+func (c *Client) Subscribe(ctx context.Context, request mcp.SubscribeRequest) error {
+	c.callHookBefore(ctx, "Subscribe", request)
+	err := c.conn.Subscribe(ctx, request)
+	c.callHookAfter(ctx, "Subscribe", nil, err)
+	return err
+}
+
+func (c *Client) Unsubscribe(ctx context.Context, request mcp.UnsubscribeRequest) error {
+	c.callHookBefore(ctx, "Unsubscribe", request)
+	err := c.conn.Unsubscribe(ctx, request)
+	c.callHookAfter(ctx, "Unsubscribe", nil, err)
+	return err
+}
+
+func (c *Client) ListPrompts(ctx context.Context, request mcp.ListPromptsRequest) (*mcp.ListPromptsResult, error) {
+	c.callHookBefore(ctx, "ListPrompts", request)
+	result, err := c.conn.ListPrompts(ctx, request)
+	c.callHookAfter(ctx, "ListPrompts", result, err)
+	return result, err
+}
+
+func (c *Client) GetPrompt(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+	c.callHookBefore(ctx, "GetPrompt", request)
+	result, err := c.conn.GetPrompt(ctx, request)
+	c.callHookAfter(ctx, "GetPrompt", result, err)
+	return result, err
+}
+
+func (c *Client) ListTools(ctx context.Context, request mcp.ListToolsRequest) (*mcp.ListToolsResult, error) {
+	c.callHookBefore(ctx, "ListTools", request)
+	result, err := c.conn.ListTools(ctx, request)
+	c.callHookAfter(ctx, "ListTools", result, err)
+	return result, err
+}
+
+func (c *Client) CallTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c.callHookBefore(ctx, "CallTool", request)
+	result, err := c.conn.CallTool(ctx, request)
+	c.callHookAfter(ctx, "CallTool", result, err)
+	return result, err
+}
+
+func (c *Client) SetLevel(ctx context.Context, request mcp.SetLevelRequest) error {
+	c.callHookBefore(ctx, "SetLevel", request)
+	err := c.conn.SetLevel(ctx, request)
+	c.callHookAfter(ctx, "SetLevel", nil, err)
+	return err
+}
+
+func (c *Client) Complete(ctx context.Context, request mcp.CompleteRequest) (*mcp.CompleteResult, error) {
+	c.callHookBefore(ctx, "Complete", request)
+	result, err := c.conn.Complete(ctx, request)
+	c.callHookAfter(ctx, "Complete", result, err)
+	return result, err
+}
+
+func (c *Client) Close() error {
+	c.callHookBefore(context.Background(), "Close", nil)
+	err := c.conn.Close()
+	c.callHookAfter(context.Background(), "Close", nil, err)
+	return err
+}
+
+func (c *Client) OnNotification(handler func(notification mcp.JSONRPCNotification)) {
+	if c.hook != nil {
+		originalHandler := handler
+		handler = func(notification mcp.JSONRPCNotification) {
+			c.hook.OnNotification(notification)
+			if originalHandler != nil {
+				originalHandler(notification)
 			}
 		}
 	}
-	return files
+	c.conn.OnNotification(handler)
 }
 
-func (c *Client) ListResourceTemplates() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	fmt.Println("列出可用的资源模板...")
-	request := mcp.ListResourceTemplatesRequest{}
-	result, err := c.conn.ListResourceTemplates(ctx, request)
-	if err != nil {
-		log.Printf("获取资源模板失败: %v", err)
-		return err
+func (c *Client) GetProjectName() string {
+	if c.project == nil {
+		return ""
 	}
-	for _, template := range result.ResourceTemplates {
-		fmt.Printf("名称: %s\n", template.Name)
-		if template.MIMEType != "" {
-			fmt.Printf("MIME类型: %s\n", template.MIMEType)
-		}
-		if template.Description != "" {
-			fmt.Printf("描述: %s\n", template.Description)
-		}
-		fmt.Println()
-	}
-	return err
-}
-
-func (c *Client) ReadResource(uri string, args map[string]interface{}) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	fmt.Printf("读取资源: %s\n", uri)
-	fmt.Printf("source: %s\n", c.project.GetName()+":///"+uri)
-
-	request := NewReadResourceRequest(c.project.GetName()+"://"+uri, args)
-	result, err := c.conn.ReadResource(ctx, request)
-	if err != nil {
-		log.Printf("读取资源失败: %v", err)
-		return err
-	}
-	fmt.Printf("资源内容Meta:\n%v\n", result.Meta)
-	fmt.Printf("资源内容:\n%v\n", result.Contents)
-	return err
-}
-
-func (c *Client) ListPrompts() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	fmt.Println("列出可用的提示...")
-	request := mcp.ListPromptsRequest{}
-	result, err := c.conn.ListPrompts(ctx, request)
-	if err != nil {
-		fmt.Printf("获取提示列表失败: %v\n", err)
-		return err
-	}
-	for _, prompt := range result.Prompts {
-		fmt.Printf("arguments: %v\n", prompt.Arguments)
-		fmt.Printf("名称: %s\n", prompt.Name)
-		if prompt.Description != "" {
-			fmt.Printf("描述: %s\n", prompt.Description)
-		}
-		fmt.Println()
-	}
-	return err
-}
-
-func (c *Client) GetPrompt(name string, args map[string]string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	fmt.Printf("获取提示: %s\n", name)
-	request := NewPromptRequest(name, args)
-	result, err := c.conn.GetPrompt(ctx, request)
-	if err != nil {
-		log.Printf("获取提示失败: %v", err)
-		return err
-	}
-	fmt.Printf("提示内容:\n%s\n", result.Description)
-	fmt.Printf("提示内容:\n%v\n", result.Messages)
-	fmt.Printf("提示内容:\n%v\n", result.Meta)
-	return err
-}
-
-func (c *Client) ListTools() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	fmt.Println("列出可用的工具...")
-	request := mcp.ListToolsRequest{}
-	result, err := c.conn.ListTools(ctx, request)
-	if err != nil {
-		log.Printf("获取工具列表失败: %v", err)
-		return err
-	}
-	for _, tool := range result.Tools {
-		fmt.Printf("名称: %s\n", tool.Name)
-		if tool.Description != "" {
-			fmt.Printf("描述: %s\n", tool.Description)
-		}
-		fmt.Printf("RawInputSchema: %s\n", tool.RawInputSchema)
-		fmt.Printf("InputSchema: %v\n", tool.InputSchema)
-		fmt.Printf("Properties: %v\n", tool.InputSchema.Properties)
-		fmt.Println()
-	}
-	return err
-}
-
-func (c *Client) CallTool(name string, args map[string]interface{}) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	fmt.Printf("调用工具: %s\n", name)
-	request := NewToolCallRequest(name, args)
-	result, err := c.conn.CallTool(ctx, request)
-	if err != nil {
-		log.Printf("工具调用失败: %v", err)
-		return err
-	}
-	fmt.Printf("执行结果:\n%s\n", result.Content)
-	fmt.Printf("执行结果:\n%v\n", result.Meta)
-	return err
+	return c.project.GetName()
 }
