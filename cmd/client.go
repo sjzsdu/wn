@@ -4,103 +4,35 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
-	"github.com/mark3labs/mcp-go/server"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/project"
 	"github.com/sjzsdu/wn/wnmcp"
-	"github.com/sjzsdu/wn/wnmcp/servers"
 	"github.com/spf13/cobra"
 )
 
 var (
-	mcpLayer string
-	mcpPort  string
-
 	mcpServer string
 	mcpAction string
 	mcpArgs   []string
 )
 
-var mcpCmd = &cobra.Command{
-	Use:   "mcp",
-	Short: lang.T("mcp commands"),
-	Long:  lang.T("mcp server and client commands for this project"),
-}
-
-var mcpServerCmd = &cobra.Command{
-	Use:   "server",
-	Short: lang.T("start mcp server"),
-	Long:  lang.T("start mcp server with specified configuration"),
-	Run:   runMcpServer,
-}
-
-var mcpClientCmd = &cobra.Command{
+var clientCmd = &cobra.Command{
 	Use:   "client",
 	Short: lang.T("start mcp client"),
 	Long:  lang.T("start mcp client with specified configuration"),
-	Run:   runMcpClient,
+	Run:   runClient,
 }
 
 func init() {
-	rootCmd.AddCommand(mcpCmd)
-
-	mcpCmd.PersistentFlags().StringVar(&mcpLayer, "layer", "stdio", lang.T("MCP transfer layer"))
-	mcpCmd.PersistentFlags().StringVar(&mcpPort, "port", "9595", lang.T("MCP sse port"))
-	mcpCmd.AddCommand(mcpServerCmd)
-	mcpCmd.AddCommand(mcpClientCmd)
-
-	mcpClientCmd.PersistentFlags().StringSliceVar(&mcpArgs, "args", nil, lang.T("MCP server command arguments"))
-	mcpClientCmd.PersistentFlags().StringVar(&mcpAction, "action", "", lang.T("MCP server action"))
-	mcpClientCmd.PersistentFlags().StringVar(&mcpServer, "server", "", lang.T("MCP server name"))
+	rootCmd.AddCommand(clientCmd)
+	clientCmd.Flags().StringSliceVar(&mcpArgs, "args", nil, lang.T("MCP server command arguments"))
+	clientCmd.Flags().StringVar(&mcpAction, "action", "", lang.T("MCP server action"))
+	clientCmd.Flags().StringVar(&mcpServer, "server", "", lang.T("MCP server name"))
 }
 
-func runMcpServer(cmd *cobra.Command, args []string) {
-	targetPath, ferr := helper.GetTargetPath(cmdPath, gitURL)
-	if ferr != nil {
-		fmt.Printf("failed to get target path: %v\n", ferr)
-		return
-	}
-
-	options := helper.WalkDirOptions{
-		DisableGitIgnore: disableGitIgnore,
-		Extensions:       extensions,
-		Excludes:         excludes,
-	}
-
-	// 构建项目树
-	project, perr := project.BuildProjectTree(targetPath, options)
-	if perr != nil {
-		fmt.Printf("failed to build project tree: %v\n", perr)
-		return
-	}
-	servers.NewResource(project)
-	servers.NewTool(project)
-	servers.NewPrompt(project)
-
-	fmt.Printf("Starting MCP server at %s...\n", targetPath)
-
-	var err error
-	switch mcpLayer {
-	case "sse":
-		if !helper.IsValidPort(mcpPort) {
-			log.Fatalf("无效的端口号: %s", mcpPort)
-		}
-		sseServer := server.NewSSEServer(wnmcp.McpServer())
-		err = sseServer.Start(":" + mcpPort)
-	case "stdio":
-		err = server.ServeStdio(wnmcp.McpServer())
-	default:
-		log.Fatalf("不支持的传输层: %s", mcpLayer)
-	}
-	if err != nil {
-		log.Fatalf("服务器错误: %v", err)
-	}
-}
-
-func runMcpClient(cmd *cobra.Command, args []string) {
+func runClient(cmd *cobra.Command, args []string) {
 	targetPath, ferr := helper.GetTargetPath(cmdPath, gitURL)
 	if ferr != nil {
 		fmt.Printf("failed to get target path: %v\n", ferr)
@@ -164,7 +96,6 @@ func runMcpClient(cmd *cobra.Command, args []string) {
 	}
 }
 
-// executeAction 执行指定的操作
 func executeAction(ctx context.Context, client *wnmcp.Client, action string, args []string) error {
 	switch action {
 	case "ping":
@@ -199,7 +130,6 @@ func executeAction(ctx context.Context, client *wnmcp.Client, action string, arg
 	}
 }
 
-// executeDefaultActions 执行默认的操作集
 func executeDefaultActions(clients *wnmcp.Clients) {
 	for name, client := range clients.GetAllClients() {
 		fmt.Printf("\n执行 %s 客户端操作...\n", name)
