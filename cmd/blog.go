@@ -82,10 +82,10 @@ func runBlog(cmd *cobra.Command, args []string) {
 		UseAgent: "blog",
 		Hooks: &aigc.Hooks{
 			AfterResponse: func(ctx context.Context, resp string) error {
-				changes, err := parseUpdateOperations(resp)
-				if err != nil {
-					fmt.Printf("解析响应失败: %v\n", err)
-					return err
+				changes, errParse := parseUpdateOperations(resp)
+				if errParse != nil {
+					fmt.Printf("解析响应失败: %v\n", errParse)
+					return errParse
 				}
 
 				if changes != nil {
