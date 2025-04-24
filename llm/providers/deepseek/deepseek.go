@@ -1,10 +1,13 @@
 package deepseek
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
@@ -20,21 +23,122 @@ type Provider struct {
 	base.Provider
 }
 
+// Complete 实现完整的请求处理
+func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return llm.CompletionResponse{}, fmt.Errorf("marshal request: %w", err)
+	}
+
+	resp, err := p.DoRequest(ctx, reqBody)
+	if err != nil {
+		return llm.CompletionResponse{}, err
+	}
+	defer resp.Body.Close()
+
+	return p.ParseResponse(resp.Body)
+}
+
+// CompleteStream 实现流式请求处理
+func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	reqBody := map[string]interface{}{
+		"model":      req.Model,
+		"messages":   req.Messages,
+		"max_tokens": req.MaxTokens,
+		"stream":     true,
+	}
+
+	if reqBody["max_tokens"] == 0 {
+		reqBody["max_tokens"] = p.MaxTokens
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+
+	resp, err := p.DoRequest(ctx, jsonBody)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return p.handleStream(resp.Body, handler)
+}
+
+// handleStream 处理流式响应
+func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error {
+	reader := bufio.NewReader(body)
+	var fullContent strings.Builder
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("read response: %w", err)
+		}
+
+		line = strings.TrimSpace(line)
+		if line == "" || line == "data: [DONE]" {
+			continue
+		}
+
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+
+		data := strings.TrimPrefix(line, "data: ")
+		content, finishReason, err := p.ParseStreamResponse(data)
+		if err != nil {
+			return fmt.Errorf("parse stream response: %w", err)
+		}
+
+		if content != "" {
+			fullContent.WriteString(content)
+			handler(llm.StreamResponse{
+				Content: content,
+				Done:    false,
+			})
+		}
+
+		if finishReason != "" {
+			handler(llm.StreamResponse{
+				Content:      fullContent.String(),
+				FinishReason: finishReason,
+				Done:        true,
+			})
+			break
+		}
+	}
+
+	return nil
+}
+
 func New(options map[string]interface{}) (llm.Provider, error) {
 	p := &Provider{
 		Provider: base.Provider{
-			APIEndpoint: defaultAPIEndpoint,
-			Client:      &http.Client{},
-			Models:      []string{"deepseek-chat", "deepseek-coder"},
-			Model:       "deepseek-chat",
-			Pname:       name,
-			MaxTokens:   share.MAX_TOKENS,
+			Models:    []string{"deepseek-chat", "deepseek-coder"},
+			Model:     "deepseek-chat",
+			Pname:     name,
+			MaxTokens: share.MAX_TOKENS,
+			HTTPHandler: base.HTTPHandler{
+				APIEndpoint: defaultAPIEndpoint,
+				Client:     &http.Client{},
+			},
 		},
 	}
 
-	// 设置响应解析器
-	p.Provider.SetParser(p)
-
+	// 配置验证和设置
 	apiKey, ok := options["WN_DEEPSEEK_APIKEY"].(string)
 	if !ok || apiKey == "" {
 		return nil, fmt.Errorf("deepseek: WN_DEEPSEEK_APIKEY is required")

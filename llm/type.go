@@ -8,12 +8,20 @@ type Message struct {
 	Content string `json:"content"`
 }
 
+// Tool 定义了一个工具的结构
+type Tool struct {
+    Name        string      `json:"name"`
+    Description string      `json:"description"`
+    Parameters  interface{} `json:"parameters"`
+}
+
 // CompletionRequest 表示请求大模型的参数
 type CompletionRequest struct {
-	Messages  []Message `json:"messages"`
-	MaxTokens int       `json:"max_tokens,omitempty"`
-	Model     string    `json:"model,omitempty"`
-	// 其他通用参数...
+	Messages       []Message `json:"messages"`
+	MaxTokens      int       `json:"max_tokens,omitempty"`
+	Model          string    `json:"model,omitempty"`
+	ResponseFormat string    `json:"response_format,omitempty"`
+	Tools          []Tool    `json:"tools,omitempty"`
 }
 
 // CompletionResponse 表示大模型的响应
@@ -52,7 +60,7 @@ type Provider interface {
 	AvailableModels() []string
 
 	SetModel(model string) string
-	
+
 	// CompleteStream 发送流式请求到大模型并通过回调处理响应
 	CompleteStream(ctx context.Context, req CompletionRequest, handler StreamHandler) error
 }

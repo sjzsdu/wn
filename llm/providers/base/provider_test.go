@@ -1,50 +1,121 @@
 package base
 
 import (
-	"io"
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
-	"github.com/sjzsdu/wn/llm"
 	"github.com/stretchr/testify/assert"
 )
 
-type mockParser struct{}
-
-func (m *mockParser) ParseResponse(body io.Reader) (llm.CompletionResponse, error) {
-	return llm.CompletionResponse{
-		Content: "test response",
-		Usage: llm.Usage{
-			PromptTokens:     10,
-			CompletionTokens: 20,
-			TotalTokens:      30,
-		},
-	}, nil
-}
-
-func TestProvider_SetParser(t *testing.T) {
-	p := &Provider{}
-	parser := &mockParser{}
-	p.SetParser(parser)
-	assert.Equal(t, parser, p.parser)
-}
-
 func TestProvider_Name(t *testing.T) {
-	p := &Provider{Pname: "test"}
+	p := &Provider{
+		Pname: "test",
+	}
 	assert.Equal(t, "test", p.Name())
 }
 
 func TestProvider_AvailableModels(t *testing.T) {
 	models := []string{"model1", "model2"}
-	p := &Provider{Models: models}
+	p := &Provider{
+		Models: models,
+	}
 	assert.Equal(t, models, p.AvailableModels())
 }
 
 func TestProvider_SetModel(t *testing.T) {
-	p := &Provider{Model: "default"}
+	p := &Provider{
+		Model: "default",
+	}
 
 	// 测试设置新模型
 	assert.Equal(t, "new-model", p.SetModel("new-model"))
 
 	// 测试空模型
 	assert.Equal(t, "new-model", p.SetModel(""))
+}
+
+func TestHTTPHandler_DoRequest(t *testing.T) {
+	// 创建测试服务器
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 验证请求头
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+
+		// 检查路径是否包含 "error"
+		if strings.Contains(r.URL.Path, "error") {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error": "bad request"}`))
+			return
+		}
+
+		// 返回正常测试响应
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"test": "response"}`))
+	}))
+	defer ts.Close()
+
+	h := &HTTPHandler{
+		APIEndpoint: ts.URL,
+		APIKey:      "test-key",
+		Client:      &http.Client{},
+	}
+
+	ctx := context.Background()
+	reqBody := []byte(`{"test": "data"}`)
+
+	// 测试成功请求
+	resp, err := h.DoRequest(ctx, reqBody)
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	defer resp.Body.Close()
+
+	// 测试错误状态码
+	h.APIEndpoint = ts.URL + "/error"
+	_, err = h.DoRequest(ctx, reqBody)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unexpected status code: 400")
+
+	// 测试无效的 endpoint
+	h.APIEndpoint = "invalid-url"
+	_, err = h.DoRequest(ctx, reqBody)
+	assert.Error(t, err)
+}
+
+func TestHTTPHandler_DoRequest_ContextCancellation(t *testing.T) {
+	h := &HTTPHandler{
+		APIEndpoint: "https://api.test.com",
+		APIKey:      "test-key",
+		Client:      &http.Client{},
+	}
+
+	// 创建已取消的上下文
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// 测试上下文取消
+	_, err := h.DoRequest(ctx, []byte(`{}`))
+	assert.Error(t, err)
+}
+
+func TestHTTPHandler_DoRequest_InvalidResponse(t *testing.T) {
+	// 创建返回错误状态码的测试服务器
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error": "bad request"}`))
+	}))
+	defer ts.Close()
+
+	h := &HTTPHandler{
+		APIEndpoint: ts.URL,
+		APIKey:      "test-key",
+		Client:      &http.Client{},
+	}
+
+	ctx := context.Background()
+	_, err := h.DoRequest(ctx, []byte(`{}`))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unexpected status code: 400")
 }
