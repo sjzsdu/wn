@@ -6,9 +6,7 @@ import (
 	"fmt"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
-	"github.com/sjzsdu/wn/project"
 	"github.com/sjzsdu/wn/wnmcp"
 	"github.com/spf13/cobra"
 )
@@ -34,34 +32,11 @@ func init() {
 }
 
 func runClient(cmd *cobra.Command, args []string) {
-	targetPath, ferr := helper.GetTargetPath(cmdPath, gitURL)
-	if ferr != nil {
-		fmt.Printf("failed to get target path: %v\n", ferr)
+	// 使用 GetMcpHost 获取 host
+	host := GetMcpHost()
+	if host == nil {
 		return
 	}
-
-	// 加载 MCP 配置
-	mcpConfig, err := wnmcp.LoadMCPConfig(targetPath)
-	if err != nil {
-		fmt.Printf("加载 MCP 配置失败: %v\n", err)
-		return
-	}
-
-	options := helper.WalkDirOptions{
-		DisableGitIgnore: disableGitIgnore,
-		Extensions:       extensions,
-		Excludes:         excludes,
-	}
-	project, _ := project.BuildProjectTree(targetPath, options)
-
-	// 创建多个客户端
-	host, err := wnmcp.NewHost(mcpConfig, project)
-	if err != nil {
-		fmt.Printf("创建客户端失败: %v\n", err)
-		return
-	}
-	// 关闭所有客户端
-	defer host.Close()
 
 	// 执行指定的操作
 	if mcpAction == "" {

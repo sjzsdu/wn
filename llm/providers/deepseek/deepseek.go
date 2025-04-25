@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
 	"github.com/sjzsdu/wn/share"
@@ -54,10 +55,15 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 		"messages":   req.Messages,
 		"max_tokens": req.MaxTokens,
 		"stream":     true,
+		"tools":      req.Tools,
 	}
 
 	if reqBody["max_tokens"] == 0 {
 		reqBody["max_tokens"] = p.MaxTokens
+	}
+
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Request Body:", reqBody)
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -115,7 +121,7 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 			handler(llm.StreamResponse{
 				Content:      fullContent.String(),
 				FinishReason: finishReason,
-				Done:        true,
+				Done:         true,
 			})
 			break
 		}
@@ -133,7 +139,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 			MaxTokens: share.MAX_TOKENS,
 			HTTPHandler: base.HTTPHandler{
 				APIEndpoint: defaultAPIEndpoint,
-				Client:     &http.Client{},
+				Client:      &http.Client{},
 			},
 		},
 	}

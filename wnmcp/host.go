@@ -169,9 +169,9 @@ func (c *Host) GetPrompt(ctx context.Context, request mcp.GetPromptRequest) (*mc
 	return lastResult, lastErr
 }
 
-func (c *Host) ListTools(ctx context.Context, request mcp.ListToolsRequest) (*mcp.ListToolsResult, error) {
+func (c *Host) ListTools(ctx context.Context, request mcp.ListToolsRequest) ([]*mcp.ListToolsResult, error) {
 	var lastErr error
-	var lastResult *mcp.ListToolsResult
+	var results []*mcp.ListToolsResult
 
 	for name, client := range c.Clients {
 		result, err := client.ListTools(ctx, request)
@@ -180,9 +180,9 @@ func (c *Host) ListTools(ctx context.Context, request mcp.ListToolsRequest) (*mc
 			lastErr = err
 			continue
 		}
-		lastResult = result
+		results = append(results, result)
 	}
-	return lastResult, lastErr
+	return results, lastErr
 }
 
 func (c *Host) CallTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

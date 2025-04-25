@@ -28,6 +28,7 @@ type ChatOptions struct {
 	MaxTokens    int
 	UseAgent     string
 	MessageLimit int
+	Tools        []llm.Tool
 	Hooks        *Hooks // 添加钩子配置
 }
 
