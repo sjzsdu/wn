@@ -31,12 +31,13 @@ func LoadMCPConfig(dir string, file string) (*MCPConfig, error) {
 	var configPath string
 	if file != "" {
 		configPath, _ = helper.GetAbsPath(file)
+	} else {
+		configPath = filepath.Join(dir, share.MCP_CONFIG_FILE)
 	}
-	configPath = filepath.Join(dir, share.MCP_CONFIG_FILE)
 
 	// 检查文件是否存在
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return nil, nil
+		return nil, err
 	}
 
 	data, err := os.ReadFile(configPath)

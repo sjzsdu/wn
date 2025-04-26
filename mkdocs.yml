@@ -44,7 +44,10 @@ nav:
       - WN: wn.md
       - Agent: wn_agent.md
       - AI: wn_ai.md
+      - Blog: wn_blog.md
       - Cache: wn_cache.md
+      - Chat: wn_chat.md
+      - Client: wn_client.md
       - Config: wn_config.md
       - Doc: wn_doc.md
       - Git: 
@@ -54,13 +57,9 @@ nav:
         - Rebase: wn_git_rebase.md
         - 帮助: wn_git_help.md
       - Help: wn_help.md
-      - MCP:
-        - 概述: wn_mcp.md
-        - 服务端: wn_mcp_server.md
-        - 客户端: wn_mcp_client.md
-        - 帮助: wn_mcp_help.md
       - Pack: wn_pack.md
       - Project: wn_project.md
+      - Server: wn_server.md
       - Static: wn_static.md
       - Version: wn_version.md
   - en:
@@ -69,7 +68,10 @@ nav:
       - WN: wn.md
       - Agent: wn_agent.md
       - AI: wn_ai.md
+      - Blog: wn_blog.md
       - Cache: wn_cache.md
+      - Chat: wn_chat.md
+      - Client: wn_client.md
       - Config: wn_config.md
       - Doc: wn_doc.md
       - Git: 
@@ -79,13 +81,9 @@ nav:
         - Rebase: wn_git_rebase.md
         - Help: wn_git_help.md
       - Help: wn_help.md
-      - MCP:
-        - Overview: wn_mcp.md
-        - Server: wn_mcp_server.md
-        - Client: wn_mcp_client.md
-        - Help: wn_mcp_help.md
       - Pack: wn_pack.md
       - Project: wn_project.md
+      - Server: wn_server.md
       - Static: wn_static.md
       - Version: wn_version.md
 

@@ -254,16 +254,11 @@ func (c *Host) GetAllClients() map[string]*Client {
 }
 
 func (c *Host) Close() error {
-	if c == nil {
-		return nil
-	}
 	var lastErr error
 	for name, client := range c.Clients {
-		if client != nil && client.conn != nil {
-			if err := client.Close(); err != nil {
-				fmt.Printf("关闭客户端 %s 失败: %v\n", name, err)
-				lastErr = err
-			}
+		if err := client.Close(); err != nil {
+			fmt.Printf("客户端 %s 关闭失败: %v\n", name, err)
+			lastErr = err
 		}
 	}
 	return lastErr
