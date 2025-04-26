@@ -2,9 +2,10 @@ package wnmcp
 
 import (
 	"context"
-	"log"
 
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/sjzsdu/wn/helper"
+	"github.com/sjzsdu/wn/share"
 )
 
 // LogHook 实现了 Hook 接口，用于打印请求和响应日志
@@ -20,19 +21,27 @@ func NewLogHook(prefix string) *LogHook {
 }
 
 func (h *LogHook) BeforeRequest(ctx context.Context, method string, args interface{}) {
-	log.Printf("%s [%s] 开始请求: %+v", h.prefix, method, args)
+	if share.GetDebug() {
+		helper.PrintWithLabel(h.prefix+"["+method+"]", args)
+	}
 }
 
 func (h *LogHook) AfterRequest(ctx context.Context, method string, response interface{}, err error) {
 	if err != nil {
-		log.Printf("%s [%s] 请求失败: %v", h.prefix, method, err)
+		if share.GetDebug() {
+			helper.PrintWithLabel(h.prefix+"["+method+"]", err)
+		}
 	} else {
-		log.Printf("%s [%s] 请求成功: %+v", h.prefix, method, response)
+		if share.GetDebug() {
+			helper.PrintWithLabel(h.prefix+"["+method+"]", response)
+		}
 	}
 }
 
 func (h *LogHook) OnNotification(notification mcp.JSONRPCNotification) {
-	log.Printf("%s 收到通知: %+v", h.prefix, notification)
+	if share.GetDebug() {
+		helper.PrintWithLabel(h.prefix+"["+"通知"+"]", notification)
+	}
 }
 
 // CompositeHook 组合多个 Hook

@@ -21,6 +21,10 @@ var (
 	gitURL           string
 	disableGitIgnore bool
 	inDebug          bool
+	llmName          string
+	llmModel         string
+	llmAgent         string
+	llmMessageLimit  int
 )
 
 var RootCmd = rootCmd
@@ -61,6 +65,10 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&disableGitIgnore, "disable-gitignore", "i", false, lang.T("Disable .gitignore rules"))
 	rootCmd.PersistentFlags().BoolVarP(&inDebug, "debug", "d", false, lang.T("Debug mode"))
 
+	rootCmd.PersistentFlags().StringVarP(&llmName, "llm-name", "c", "", lang.T("LLM model Provider"))
+	rootCmd.PersistentFlags().StringVarP(&llmModel, "llm-model", "m", "", lang.T("LLM model to use"))
+	rootCmd.PersistentFlags().StringVarP(&llmAgent, "llm-agent", "a", "", lang.T("AI use agent name"))
+	rootCmd.PersistentFlags().IntVarP(&llmMessageLimit, "llm-message-limit", "l", 1000, lang.T("LLM message limit"))
 	// 设置全局 debug 模式
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		share.SetDebug(inDebug)

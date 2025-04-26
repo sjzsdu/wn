@@ -3,8 +3,10 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/sjzsdu/wn/aigc"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/project"
+	"github.com/sjzsdu/wn/share"
 	"github.com/sjzsdu/wn/wnmcp"
 )
 
@@ -39,4 +41,27 @@ func GetMcpHost() *wnmcp.Host {
 
 	defer host.Close()
 	return host
+}
+
+func GetChatOptions() *aigc.ChatOptions {
+	// 设置默认值
+	if llmName == "" {
+		llmName = share.DEFAULT_LLM_NAME
+	}
+	if llmModel == "" {
+		llmModel = share.DEFAULT_LLM_MODEL
+	}
+	if llmAgent == "" {
+		llmAgent = share.DEFAULT_LLM_AGENT
+	}
+	if llmMessageLimit <= 0 {
+		llmMessageLimit = share.DEFAULT_LLM_MESSAGES_LIMIT
+	}
+
+	return &aigc.ChatOptions{
+		ProviderName: llmName,
+		Model:        llmModel,
+		UseAgent:     llmAgent,
+		MessageLimit: llmMessageLimit,
+	}
 }

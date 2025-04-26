@@ -6,7 +6,9 @@ import (
 
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/project"
+	"github.com/sjzsdu/wn/share"
 )
 
 type Host struct {
@@ -32,6 +34,9 @@ func createMCPClient(config MCPServerConfig) (client.MCPClient, error) {
 func NewHost(config *MCPConfig, project *project.Project) (*Host, error) {
 	if config == nil {
 		return nil, nil
+	}
+	if share.GetDebug() {
+		helper.PrintWithLabel("Mcp Host confg:", config)
 	}
 
 	Host := &Host{

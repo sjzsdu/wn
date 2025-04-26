@@ -32,11 +32,10 @@ func runChat(cmd *cobra.Command, args []string) {
 	}
 
 	tools := host.GetTools(context.Background(), mcp.ListToolsRequest{})
-	chat, _ := aigc.NewChat(aigc.ChatOptions{
-		UseAgent: "blog",
-		Hooks:    &aigc.Hooks{},
-		Tools:    tools,
-	})
+	chatOption := GetChatOptions()
+	chatOption.Tools = tools
+	chatOption.Hooks = &aigc.Hooks{}
+	chat, _ := aigc.NewChat(*chatOption)
 	// 启动交互式会话
 	ctx := context.Background()
 	chat.StartInteractiveSession(ctx, aigc.InteractiveOptions{
