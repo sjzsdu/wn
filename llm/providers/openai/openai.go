@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
 	"github.com/sjzsdu/wn/share"
@@ -32,7 +33,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 			MaxTokens: share.MAX_TOKENS,
 			HTTPHandler: base.HTTPHandler{
 				APIEndpoint: defaultAPIEndpoint,
-				Client:     &http.Client{},
+				Client:      &http.Client{},
 			},
 		},
 	}
@@ -58,16 +59,16 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 
 // Complete 实现完整的请求处理
 func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
-	if req.Model == "" {
-		req.Model = p.Model
-	}
+	reqBody := p.Provider.CommonRequest(req)
+	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
+	reqBodyStruct.Stream = false
 
-	reqBody, err := json.Marshal(req)
+	jsonBody, err := json.Marshal(reqBodyStruct)
 	if err != nil {
 		return llm.CompletionResponse{}, fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := p.DoRequest(ctx, reqBody)
+	resp, err := p.DoRequest(ctx, jsonBody)
 	if err != nil {
 		return llm.CompletionResponse{}, err
 	}
@@ -78,22 +79,11 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 
 // CompleteStream 实现流式请求处理
 func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-	if req.Model == "" {
-		req.Model = p.Model
-	}
+	reqBody := p.Provider.CommonRequest(req)
+	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
+	reqBodyStruct.Stream = true
 
-	reqBody := map[string]interface{}{
-		"model":      req.Model,
-		"messages":   req.Messages,
-		"max_tokens": req.MaxTokens,
-		"stream":     true,
-	}
-
-	if reqBody["max_tokens"] == 0 {
-		reqBody["max_tokens"] = p.MaxTokens
-	}
-
-	jsonBody, err := json.Marshal(reqBody)
+	jsonBody, err := json.Marshal(reqBodyStruct)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
 	}
@@ -148,7 +138,7 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 			handler(llm.StreamResponse{
 				Content:      fullContent.String(),
 				FinishReason: finishReason,
-				Done:        true,
+				Done:         true,
 			})
 			break
 		}
@@ -210,6 +200,18 @@ func (p *Provider) ParseStreamResponse(data string) (content string, finishReaso
 	}
 
 	return streamResp.Choices[0].Delta.Content, streamResp.Choices[0].FinishReason, nil
+}
+
+func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
+	request, _ := helper.MapToStruct[CompletionRequestBody](reqBody)
+	return request
+}
+
+type CompletionRequestBody struct {
+	Model     string        `json:"model"`
+	Messages  []llm.Message `json:"messages"`
+	MaxTokens int           `json:"max_tokens"`
+	Stream    bool          `json:"stream"`
 }
 
 func init() {

@@ -29,18 +29,22 @@ func (m *mockProvider) SetModel(model string) string {
 // 修正Complete方法的签名以匹配Provider接口
 func (m *mockProvider) Complete(ctx context.Context, req CompletionRequest) (CompletionResponse, error) {
 	return CompletionResponse{
-		// 使用正确的字段名
 		Content: "mock completion",
 	}, nil
 }
 
-// 删除旧的 StreamResponse 方法
+// 实现CompleteStream方法
 func (m *mockProvider) CompleteStream(ctx context.Context, req CompletionRequest, handler StreamHandler) error {
 	handler(StreamResponse{
 		Content: "mock stream content",
 		Done:    true,
 	})
 	return nil
+}
+
+// 添加HandleRequestBody方法以完整实现Provider接口
+func (m *mockProvider) HandleRequestBody(req CompletionRequest, reqBody map[string]interface{}) interface{} {
+	return reqBody
 }
 
 func TestRegisterAndCreateProvider(t *testing.T) {
@@ -71,6 +75,18 @@ func TestRegisterAndCreateProvider(t *testing.T) {
 	}
 	if provider == nil {
 		t.Error("Expected provider not to be nil")
+	}
+
+	// 测试HandleRequestBody方法
+	req := CompletionRequest{
+		Messages: []Message{{Role: "user", Content: "test"}},
+	}
+	reqBody := map[string]interface{}{
+		"messages": []Message{{Role: "user", Content: "test"}},
+	}
+	result := provider.HandleRequestBody(req, reqBody)
+	if result == nil {
+		t.Error("Expected HandleRequestBody result not to be nil")
 	}
 
 	// 测试创建不存在的provider

@@ -45,7 +45,7 @@ type StreamResponse struct {
 // StreamHandler 处理流式响应的回调函数
 type StreamHandler func(StreamResponse)
 
-// 在 Provider 接口中添加流式方法
+// Provider 接口定义
 type Provider interface {
 	// Complete 发送请求到大模型并获取回复
 	Complete(ctx context.Context, req CompletionRequest) (CompletionResponse, error)
@@ -61,5 +61,6 @@ type Provider interface {
 
 	SetModel(model string) string
 
-	// HandleTools()
+	// 使用泛型定义 HandleRequestBody 方法
+	HandleRequestBody(req CompletionRequest, reqBody map[string]interface{}) interface{}
 }

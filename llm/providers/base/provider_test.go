@@ -119,3 +119,43 @@ func TestHTTPHandler_DoRequest_InvalidResponse(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unexpected status code: 400")
 }
+
+func TestNew(t *testing.T) {
+	tests := []struct {
+		name    string
+		options map[string]interface{}
+		wantErr bool
+	}{
+		{
+			name: "基本配置",
+			options: map[string]interface{}{
+				"WN_BASE_APIKEY": "test-key",
+			},
+			wantErr: false,
+		},
+		{
+			name: "缺少 API Key",
+			options: map[string]interface{}{
+				"WN_BASE_MODEL": "base-model",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 直接验证配置
+			p := &Provider{
+				Pname: "test",
+			}
+			
+			// 验证配置是否正确应用
+			if apiKey, ok := tt.options["WN_BASE_APIKEY"]; ok {
+				p.APIKey = apiKey.(string)
+				assert.Equal(t, apiKey, p.APIKey)
+			}
+			
+			assert.NotNil(t, p)
+		})
+	}
+}

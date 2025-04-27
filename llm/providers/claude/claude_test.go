@@ -64,6 +64,13 @@ func TestParseStreamResponse(t *testing.T) {
 			wantFinish: "end_turn",
 			wantErr: false,
 		},
+		{
+			name:        "无效 JSON",
+			input:       `invalid json`,
+			wantContent: "",
+			wantFinish:  "",
+			wantErr:     true,
+		},
 	}
 
 	for _, tt := range tests {

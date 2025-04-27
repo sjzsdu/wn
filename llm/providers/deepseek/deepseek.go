@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
@@ -24,18 +25,58 @@ type Provider struct {
 	base.Provider
 }
 
-// Complete 实现完整的请求处理
-func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
-	if req.Model == "" {
-		req.Model = p.Model
+func New(options map[string]interface{}) (llm.Provider, error) {
+	p := &Provider{
+		Provider: base.Provider{
+			Models:    []string{"deepseek-chat", "deepseek-coder"},
+			Model:     "deepseek-chat",
+			Pname:     name,
+			MaxTokens: share.MAX_TOKENS,
+			HTTPHandler: base.HTTPHandler{
+				APIEndpoint: defaultAPIEndpoint,
+				Client:      &http.Client{},
+			},
+		},
 	}
 
-	reqBody, err := json.Marshal(req)
+	// 配置验证和设置
+	apiKey, ok := options["WN_DEEPSEEK_APIKEY"].(string)
+	if !ok || apiKey == "" {
+		return nil, fmt.Errorf("deepseek: WN_DEEPSEEK_APIKEY is required")
+	}
+	p.APIKey = apiKey
+
+	if endpoint, ok := options["WN_DEEPSEEK_ENDPOINT"].(string); ok && endpoint != "" {
+		p.APIEndpoint = endpoint
+	}
+	if models, ok := options["WN_DEEPSEEK_MODELS"].([]string); ok && len(models) > 0 {
+		p.Models = models
+	}
+	if model, ok := options["WN_DEEPSEEK_MODEL"].(string); ok {
+		p.Model = model
+	}
+
+	return p, nil
+}
+
+// Complete 实现完整的请求处理
+func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
+
+	reqBody := p.Provider.CommonRequest(req)
+	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
+	reqBodyStruct.Stream = true
+
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Request Body:", reqBodyStruct)
+	}
+
+	jsonBody, err := json.Marshal(reqBodyStruct)
+
 	if err != nil {
 		return llm.CompletionResponse{}, fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := p.DoRequest(ctx, reqBody)
+	resp, err := p.DoRequest(ctx, jsonBody)
 	if err != nil {
 		return llm.CompletionResponse{}, err
 	}
@@ -46,27 +87,16 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 
 // CompleteStream 实现流式请求处理
 func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-	if req.Model == "" {
-		req.Model = p.Model
-	}
 
-	reqBody := map[string]interface{}{
-		"model":      req.Model,
-		"messages":   req.Messages,
-		"max_tokens": req.MaxTokens,
-		"stream":     true,
-		"tools":      req.Tools,
-	}
-
-	if reqBody["max_tokens"] == 0 {
-		reqBody["max_tokens"] = p.MaxTokens
-	}
+	reqBody := p.Provider.CommonRequest(req)
+	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
+	reqBodyStruct.Stream = true
 
 	if share.GetDebug() {
 		helper.PrintWithLabel("[DEBUG] Request Body:", reqBody)
 	}
 
-	jsonBody, err := json.Marshal(reqBody)
+	jsonBody, err := json.Marshal(reqBodyStruct)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
 	}
@@ -78,6 +108,13 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 	defer resp.Body.Close()
 
 	return p.handleStream(resp.Body, handler)
+}
+
+func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
+	request, _ := helper.MapToStruct[CompletionRequestBody](reqBody)
+	request.Tools = p.handleTools(req.Tools)
+
+	return request
 }
 
 // handleStream 处理流式响应
@@ -130,38 +167,34 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 	return nil
 }
 
-func New(options map[string]interface{}) (llm.Provider, error) {
-	p := &Provider{
-		Provider: base.Provider{
-			Models:    []string{"deepseek-chat", "deepseek-coder"},
-			Model:     "deepseek-chat",
-			Pname:     name,
-			MaxTokens: share.MAX_TOKENS,
-			HTTPHandler: base.HTTPHandler{
-				APIEndpoint: defaultAPIEndpoint,
-				Client:      &http.Client{},
+func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
+	if len(tools) == 0 {
+		return nil
+	}
+
+	result := make([]Tool, 0, len(tools))
+	for _, t := range tools {
+		// 创建一个新的 deepseek Tool
+		dsTool := Tool{
+			Type: "function",
+			Function: Function{
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters: map[string]interface{}{
+					"type":       "object",
+					"properties": t.InputSchema.Properties,
+				},
 			},
-		},
+		}
+
+		if len(t.InputSchema.Required) > 0 {
+			dsTool.Function.Parameters["required"] = t.InputSchema.Required
+		}
+
+		result = append(result, dsTool)
 	}
 
-	// 配置验证和设置
-	apiKey, ok := options["WN_DEEPSEEK_APIKEY"].(string)
-	if !ok || apiKey == "" {
-		return nil, fmt.Errorf("deepseek: WN_DEEPSEEK_APIKEY is required")
-	}
-	p.APIKey = apiKey
-
-	if endpoint, ok := options["WN_DEEPSEEK_ENDPOINT"].(string); ok && endpoint != "" {
-		p.APIEndpoint = endpoint
-	}
-	if models, ok := options["WN_DEEPSEEK_MODELS"].([]string); ok && len(models) > 0 {
-		p.Models = models
-	}
-	if model, ok := options["WN_DEEPSEEK_MODEL"].(string); ok {
-		p.Model = model
-	}
-
-	return p, nil
+	return result
 }
 
 func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error) {

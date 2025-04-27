@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/sjzsdu/wn/llm"
 )
 
 // HTTPHandler 处理基础的 HTTP 请求
@@ -65,4 +67,22 @@ func (p *Provider) SetModel(model string) string {
 	}
 	p.Model = model
 	return p.Model
+}
+
+func (p *Provider) CommonRequest(req llm.CompletionRequest) map[string]interface{} {
+	if req.Model == "" {
+		req.Model = p.Model
+	}
+
+	if req.MaxTokens == 0 {
+		req.MaxTokens = p.MaxTokens
+	}
+
+	reqBody := map[string]interface{}{
+		"model":      req.Model,
+		"messages":   req.Messages,
+		"max_tokens": req.MaxTokens,
+	}
+
+	return reqBody
 }
