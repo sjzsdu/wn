@@ -148,13 +148,13 @@ func TestNew(t *testing.T) {
 			p := &Provider{
 				Pname: "test",
 			}
-			
+
 			// 验证配置是否正确应用
 			if apiKey, ok := tt.options["WN_BASE_APIKEY"]; ok {
 				p.APIKey = apiKey.(string)
 				assert.Equal(t, apiKey, p.APIKey)
 			}
-			
+
 			assert.NotNil(t, p)
 		})
 	}

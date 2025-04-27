@@ -3,7 +3,6 @@ package aigc
 import (
 	"context"
 
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/message"
 )
@@ -25,12 +24,10 @@ type Hooks struct {
 // ChatOptions 配置聊天选项
 type ChatOptions struct {
 	ProviderName string
-	Model        string
-	MaxTokens    int
-	UseAgent     string
 	MessageLimit int
-	Tools        []mcp.Tool
-	Hooks        *Hooks // 添加钩子配置
+	UseAgent     string
+	Hooks        *Hooks
+	Request      llm.CompletionRequest
 }
 
 // Chat 表示一个AI聊天会话

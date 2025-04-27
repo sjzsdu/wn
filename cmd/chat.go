@@ -34,11 +34,11 @@ func runChat(cmd *cobra.Command, args []string) {
 
 	tools := host.GetTools(context.Background(), mcp.ListToolsRequest{})
 	chatOption := GetChatOptions()
-	chatOption.Tools = tools
-	chatOption.Hooks = &aigc.Hooks{}
+	chatOption.Request.Tools = tools
 	chat, _ := aigc.NewChat(*chatOption)
 	// 启动交互式会话
 	ctx := context.Background()
+	// chat.SendMessage(ctx, "当前有多少文件")
 	chat.StartInteractiveSession(ctx, aigc.InteractiveOptions{
 		Renderer: helper.GetDefaultRenderer(),
 		Debug:    false,

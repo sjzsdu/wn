@@ -5,6 +5,7 @@ import (
 
 	"github.com/sjzsdu/wn/aigc"
 	"github.com/sjzsdu/wn/helper"
+	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/project"
 	"github.com/sjzsdu/wn/share"
 	"github.com/sjzsdu/wn/wnmcp"
@@ -59,8 +60,13 @@ func GetChatOptions() *aigc.ChatOptions {
 
 	return &aigc.ChatOptions{
 		ProviderName: llmName,
-		Model:        llmModel,
-		UseAgent:     llmAgent,
 		MessageLimit: llmMessageLimit,
+		UseAgent:     llmAgent,
+		Hooks:        &aigc.Hooks{},
+		Request: llm.CompletionRequest{
+			Model:          llmModel,
+			MaxTokens:      0,
+			ResponseFormat: "text",
+		},
 	}
 }

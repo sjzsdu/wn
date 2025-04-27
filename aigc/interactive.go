@@ -80,12 +80,10 @@ func (c *Chat) processInteraction(ctx context.Context, input string, opts Intera
 
 	go func() {
 		var fullContent strings.Builder
-		err := c.provider.CompleteStream(ctx, llm.CompletionRequest{
-			Model:     c.options.Model,
-			Messages:  c.getContextMessages(),
-			MaxTokens: c.options.MaxTokens,
-			Tools:     c.options.Tools,
-		}, func(resp llm.StreamResponse) {
+		req := c.options.Request
+		req.Messages = c.getContextMessages()
+
+		err := c.provider.CompleteStream(ctx, req, func(resp llm.StreamResponse) {
 			if !responseStarted {
 				loadingDone <- true
 				responseStarted = true

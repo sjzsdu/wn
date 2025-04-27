@@ -80,10 +80,13 @@ func (c *aiCommand) runAI(cmd *cobra.Command, args []string) {
 
 	chat, err := aigc.NewChat(aigc.ChatOptions{
 		ProviderName: c.providerName,
-		Model:        c.model,
-		MaxTokens:    c.maxTokens,
-		UseAgent:     c.useAgent,
 		MessageLimit: MaxRecentMessages,
+		UseAgent:     c.useAgent,
+		Request: llm.CompletionRequest{
+			Model:          c.model,
+			MaxTokens:      c.maxTokens,
+			ResponseFormat: "text",
+		},
 	})
 	if err != nil {
 		fmt.Printf(lang.T("Failed to initialize chat: %v\n"), err)

@@ -16,11 +16,13 @@ import (
 func defaultOptions() ChatOptions {
 	return ChatOptions{
 		ProviderName: "",
-		Model:        "",
-		MaxTokens:    0,
-		UseAgent:     "",
 		MessageLimit: 2,
-		Hooks:        &Hooks{}, // 初始化空钩子
+		Hooks:        &Hooks{},
+		Request: llm.CompletionRequest{
+			Model:          "",
+			MaxTokens:      0,
+			ResponseFormat: "text",
+		},
 	}
 }
 
@@ -29,23 +31,17 @@ func mergeOptions(base, override ChatOptions) ChatOptions {
 	if override.ProviderName != "" {
 		base.ProviderName = override.ProviderName
 	}
-	if override.Model != "" {
-		base.Model = override.Model
+	if override.Request.Model != "" {
+		base.Request.Model = override.Request.Model
 	}
-	if override.MaxTokens != 0 {
-		base.MaxTokens = override.MaxTokens
+	if override.Request.MaxTokens != 0 {
+		base.Request.MaxTokens = override.Request.MaxTokens
 	}
-	if override.UseAgent != "" {
-		base.UseAgent = override.UseAgent
+	if override.Request.ResponseFormat != "" {
+		base.Request.ResponseFormat = override.Request.ResponseFormat
 	}
-	if override.MessageLimit != 0 {
-		base.MessageLimit = override.MessageLimit
-	}
-	if override.Hooks != nil {
-		base.Hooks = override.Hooks
-	}
-	if override.Tools != nil {
-		base.Tools = override.Tools
+	if override.Request.Tools != nil {
+		base.Request.Tools = override.Request.Tools
 	}
 	return base
 }
@@ -91,11 +87,8 @@ func (c *Chat) SendMessage(ctx context.Context, content string) (string, error) 
 	}
 
 	var response strings.Builder
-	req := llm.CompletionRequest{
-		Model:     c.options.Model,
-		Messages:  c.getContextMessages(),
-		MaxTokens: c.options.MaxTokens,
-	}
+	req := c.options.Request
+	req.Messages = c.getContextMessages()
 
 	// 执行响应前钩子
 	if c.options.Hooks.BeforeResponse != nil {

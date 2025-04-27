@@ -55,10 +55,13 @@ func runproject(cmd *cobra.Command, args []string) {
 	// 创建聊天实例
 	chat, err := aigc.NewChat(aigc.ChatOptions{
 		ProviderName: "", // 使用默认 provider
-		Model:        "", // 使用默认 model
-		MaxTokens:    0,  // 使用默认 token 限制
-		UseAgent:     "project",
 		MessageLimit: MaxRecentMessages,
+		UseAgent:     "project",
+		Request: llm.CompletionRequest{
+			Model:          "", // 使用默认 model
+			MaxTokens:      0,  // 使用默认 token 限制
+			ResponseFormat: "text",
+		},
 	})
 	if err != nil {
 		fmt.Printf("failed to initialize chat: %v\n", err)
