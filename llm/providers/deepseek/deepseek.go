@@ -64,10 +64,9 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 
 	reqBody := p.Provider.CommonRequest(req)
 	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
-	reqBodyStruct.Stream = true
 
 	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Request Body:", reqBodyStruct)
+		helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
 	}
 
 	jsonBody, err := json.Marshal(reqBodyStruct)
@@ -93,7 +92,7 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 	reqBodyStruct.Stream = true
 
 	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Request Body:", reqBody)
+		helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
 	}
 
 	jsonBody, err := json.Marshal(reqBodyStruct)
@@ -112,7 +111,16 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 
 func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
 	request, _ := helper.MapToStruct[CompletionRequestBody](reqBody)
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Request Tools:", req.Tools)
+	}
 	request.Tools = p.handleTools(req.Tools)
+	request.ResponseFormat = ResponseFormat{
+		Type: req.ResponseFormat,
+	}
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Resolve Tools:", request.Tools)
+	}
 
 	return request
 }

@@ -11,19 +11,19 @@ const DEFAULT_AGENT = "fullstack"
 
 // 添加语言映射表
 var languageMap = map[string]string{
-	"zh":      "中文",
-	"cn":      "中文",
-	"zh-CN":   "中文",
-	"en":      "英文",
-	"english": "英文",
-	"jp":      "日文",
-	"ja":      "日文",
-	"kr":      "韩文",
-	"ko":      "韩文",
-	"fr":      "法文",
-	"de":      "德文",
-	"es":      "西班牙文",
-	"ru":      "俄文",
+	"zh":      "你需要用中文语言回复。",
+	"cn":      "你需要用中文语言回复。",
+	"zh-CN":   "你需要用中文语言回复。",
+	"en":      "Please respond in English.",
+	"english": "Please respond in English.",
+	"jp":      "日本語で返信してください。",
+	"ja":      "日本語で返信してください。",
+	"kr":      "한국어로 응답해 주세요.",
+	"ko":      "한국어로 응답해 주세요.",
+	"fr":      "Veuillez répondre en français.",
+	"de":      "Bitte antworten Sie auf Deutsch.",
+	"es":      "Por favor, responda en español.",
+	"ru":      "Пожалуйста, ответьте на русском языке.",
 }
 
 // GetAgentMessages 返回预设的 agent 系统消息
@@ -45,13 +45,12 @@ func GetAgentMessages(name string) []llm.Message {
 
 	if config.GetConfig("lang") != "" && name != "translate" {
 		lang := config.GetConfig("lang")
-		if displayLang, ok := languageMap[strings.ToLower(lang)]; ok {
-			lang = displayLang
+		if promptText, ok := languageMap[strings.ToLower(lang)]; ok {
+			messages = append(messages, llm.Message{
+				Role:    "system",
+				Content: promptText,
+			})
 		}
-		messages = append(messages, llm.Message{
-			Role:    "system",
-			Content: "你需要用" + lang + "语言回复。",
-		})
 	}
 
 	return messages

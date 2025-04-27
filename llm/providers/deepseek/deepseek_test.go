@@ -142,6 +142,118 @@ func TestHandleRequestBody(t *testing.T) {
 			},
 			wantType: "*deepseek.CompletionRequestBody",
 		},
+		{
+			name: "带单路径工具的请求体转换",
+			req: llm.CompletionRequest{
+				Messages: []llm.Message{
+					{Role: "user", Content: "hello"},
+				},
+				Tools: []mcp.Tool{
+					{
+						Name:        "path_tool",
+						Description: "test path tool",
+						InputSchema: mcp.ToolInputSchema{
+							Type: "object",
+							Properties: map[string]interface{}{
+								"path": map[string]interface{}{
+									"type": "string",
+								},
+							},
+							Required: []string{"path"},
+						},
+					},
+				},
+			},
+			reqBody: map[string]interface{}{
+				"messages": []llm.Message{
+					{Role: "user", Content: "hello"},
+				},
+			},
+			wantType: "*deepseek.CompletionRequestBody",
+		},
+		{
+			name: "带多路径工具的请求体转换",
+			req: llm.CompletionRequest{
+				Messages: []llm.Message{
+					{Role: "user", Content: "hello"},
+				},
+				Tools: []mcp.Tool{
+					{
+						Name:        "paths_tool",
+						Description: "test paths tool",
+						InputSchema: mcp.ToolInputSchema{
+							Type: "object",
+							Properties: map[string]interface{}{
+								"paths": map[string]interface{}{
+									"type": "array",
+									"items": map[string]interface{}{
+										"type": "string",
+									},
+								},
+							},
+							Required: []string{"paths"},
+						},
+					},
+				},
+			},
+			reqBody: map[string]interface{}{
+				"messages": []llm.Message{
+					{Role: "user", Content: "hello"},
+				},
+			},
+			wantType: "*deepseek.CompletionRequestBody",
+		},
+		{
+			name: "带编辑工具的请求体转换",
+			req: llm.CompletionRequest{
+				Messages: []llm.Message{
+					{Role: "user", Content: "hello"},
+				},
+				Tools: []mcp.Tool{
+					{
+						Name:        "edit_tool",
+						Description: "test edit tool",
+						InputSchema: mcp.ToolInputSchema{
+							Type: "object",
+							Properties: map[string]interface{}{
+								"path": map[string]interface{}{
+									"type": "string",
+								},
+								"edits": map[string]interface{}{
+									"type": "array",
+									"items": map[string]interface{}{
+										"type": "object",
+										"properties": map[string]interface{}{
+											"oldText": map[string]interface{}{
+												"type":        "string",
+												"description": "Text to search for - must match exactly",
+											},
+											"newText": map[string]interface{}{
+												"type":        "string",
+												"description": "Text to replace with",
+											},
+										},
+										"required": []string{"oldText", "newText"},
+									},
+								},
+								"dryRun": map[string]interface{}{
+									"type":        "boolean",
+									"default":     false,
+									"description": "Preview changes using git-style diff format",
+								},
+							},
+							Required: []string{"path", "edits"},
+						},
+					},
+				},
+			},
+			reqBody: map[string]interface{}{
+				"messages": []llm.Message{
+					{Role: "user", Content: "hello"},
+				},
+			},
+			wantType: "*deepseek.CompletionRequestBody",
+		},
 	}
 
 	for _, tt := range tests {
@@ -166,6 +278,188 @@ func TestHandleRequestBody(t *testing.T) {
 				assert.Equal(t, tt.req.Tools[0].Name, reqBody.Tools[0].Function.Name)
 				assert.Equal(t, tt.req.Tools[0].Description, reqBody.Tools[0].Function.Description)
 			}
+		})
+	}
+}
+
+func TestHandleTools(t *testing.T) {
+	p := &Provider{}
+	tests := []struct {
+		name     string
+		tools    []mcp.Tool
+		expected []Tool
+	}{
+		{
+			name: "单路径工具",
+			tools: []mcp.Tool{
+				{
+					Name:        "path_tool",
+					Description: "测试单路径工具",
+					InputSchema: mcp.ToolInputSchema{
+						Type: "object",
+						Properties: map[string]interface{}{
+							"path": map[string]interface{}{
+								"type": "string",
+							},
+						},
+						Required: []string{"path"},
+					},
+				},
+			},
+			expected: []Tool{
+				{
+					Type: "function",
+					Function: Function{
+						Name:        "path_tool",
+						Description: "测试单路径工具",
+						Parameters: map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"path": map[string]interface{}{
+									"type": "string",
+								},
+							},
+							"required": []string{"path"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "多路径工具",
+			tools: []mcp.Tool{
+				{
+					Name:        "paths_tool",
+					Description: "测试多路径工具",
+					InputSchema: mcp.ToolInputSchema{
+						Type: "object",
+						Properties: map[string]interface{}{
+							"paths": map[string]interface{}{
+								"type": "array",
+								"items": map[string]interface{}{
+									"type": "string",
+								},
+							},
+						},
+						Required: []string{"paths"},
+					},
+				},
+			},
+			expected: []Tool{
+				{
+					Type: "function",
+					Function: Function{
+						Name:        "paths_tool",
+						Description: "测试多路径工具",
+						Parameters: map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"paths": map[string]interface{}{
+									"type": "array",
+									"items": map[string]interface{}{
+										"type": "string",
+									},
+								},
+							},
+							"required": []string{"paths"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "编辑工具",
+			tools: []mcp.Tool{
+				{
+					Name:        "edit_tool",
+					Description: "测试编辑工具",
+					InputSchema: mcp.ToolInputSchema{
+						Type: "object",
+						Properties: map[string]interface{}{
+							"dryRun": map[string]interface{}{
+								"type":        "boolean",
+								"default":     false,
+								"description": "Preview changes using git-style diff format",
+							},
+							"edits": map[string]interface{}{
+								"type": "array",
+								"items": map[string]interface{}{
+									"type": "object",
+									"properties": map[string]interface{}{
+										"oldText": map[string]interface{}{
+											"type":        "string",
+											"description": "Text to search for - must match exactly",
+										},
+										"newText": map[string]interface{}{
+											"type":        "string",
+											"description": "Text to replace with",
+										},
+									},
+									"required":             []string{"oldText", "newText"},
+									"additionalProperties": false,
+								},
+							},
+							"path": map[string]interface{}{
+								"type": "string",
+							},
+						},
+						Required: []string{"path", "edits"},
+					},
+				},
+			},
+			expected: []Tool{
+				{
+					Type: "function",
+					Function: Function{
+						Name:        "edit_tool",
+						Description: "测试编辑工具",
+						Parameters: map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"dryRun": map[string]interface{}{
+									"type":        "boolean",
+									"default":     false,
+									"description": "Preview changes using git-style diff format",
+								},
+								"edits": map[string]interface{}{
+									"type": "array",
+									"items": map[string]interface{}{
+										"type": "object",
+										"properties": map[string]interface{}{
+											"oldText": map[string]interface{}{
+												"type":        "string",
+												"description": "Text to search for - must match exactly",
+											},
+											"newText": map[string]interface{}{
+												"type":        "string",
+												"description": "Text to replace with",
+											},
+										},
+										"required":             []string{"oldText", "newText"},
+										"additionalProperties": false,
+									},
+								},
+								"path": map[string]interface{}{
+									"type": "string",
+								},
+							},
+							"required": []string{"path", "edits"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "空工具列表",
+			tools:    []mcp.Tool{},
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := p.handleTools(tt.tools)
+			assert.Equal(t, tt.expected, result, "工具转换结果不匹配")
 		})
 	}
 }
