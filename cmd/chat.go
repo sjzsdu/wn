@@ -30,6 +30,7 @@ func runChat(cmd *cobra.Command, args []string) {
 	if host == nil {
 		return
 	}
+	defer host.Close()
 
 	tools := host.GetTools(context.Background(), mcp.ListToolsRequest{})
 	chatOption := GetChatOptions()

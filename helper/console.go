@@ -9,6 +9,10 @@ import (
 // PrintWithLabel 带标签的打印，方便调试时识别输出内容
 func PrintWithLabel(label string, v interface{}) {
 	fmt.Printf("[%s]: ", label)
+	if v == nil {
+		fmt.Println("nil")
+		return
+	}
 	Print(v)
 }
 

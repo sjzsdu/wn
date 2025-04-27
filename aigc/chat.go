@@ -44,6 +44,9 @@ func mergeOptions(base, override ChatOptions) ChatOptions {
 	if override.Hooks != nil {
 		base.Hooks = override.Hooks
 	}
+	if override.Tools != nil {
+		base.Tools = override.Tools
+	}
 	return base
 }
 

@@ -48,15 +48,15 @@ func NewClient(conn client.MCPClient, project *project.Project, opts ...ClientOp
 }
 
 func (c *Client) callHookBefore(ctx context.Context, method string, args interface{}) {
-	if c.hook != nil {
-		c.hook.BeforeRequest(ctx, method, args)
-	}
+    if c.hook != nil {
+        c.hook.BeforeRequest(ctx, method, args)
+    }
 }
 
 func (c *Client) callHookAfter(ctx context.Context, method string, response interface{}, err error) {
-	if c.hook != nil {
-		c.hook.AfterRequest(ctx, method, response, err)
-	}
+    if c.hook != nil {
+        c.hook.AfterRequest(ctx, method, response, err)
+    }
 }
 
 // 实现 MCPClient 接口的所有方法

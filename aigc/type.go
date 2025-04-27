@@ -3,6 +3,7 @@ package aigc
 import (
 	"context"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/message"
 )
@@ -28,7 +29,7 @@ type ChatOptions struct {
 	MaxTokens    int
 	UseAgent     string
 	MessageLimit int
-	Tools        []llm.Tool
+	Tools        []mcp.Tool
 	Hooks        *Hooks // 添加钩子配置
 }
 

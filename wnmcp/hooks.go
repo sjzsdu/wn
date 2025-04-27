@@ -22,18 +22,22 @@ func NewLogHook(prefix string) *LogHook {
 
 func (h *LogHook) BeforeRequest(ctx context.Context, method string, args interface{}) {
 	if share.GetDebug() {
-		helper.PrintWithLabel(h.prefix+"["+method+"]", args)
+		if args == nil {
+			helper.PrintWithLabel("BeforeRequest: "+h.prefix+"["+method+"]", "nil arguments")
+		} else {
+			helper.PrintWithLabel("BeforeRequest: "+h.prefix+"["+method+"]", args)
+		}
 	}
 }
 
 func (h *LogHook) AfterRequest(ctx context.Context, method string, response interface{}, err error) {
 	if err != nil {
 		if share.GetDebug() {
-			helper.PrintWithLabel(h.prefix+"["+method+"]", err)
+			helper.PrintWithLabel("AfterRequest: "+h.prefix+"["+method+"]", err)
 		}
 	} else {
 		if share.GetDebug() {
-			helper.PrintWithLabel(h.prefix+"["+method+"]", response)
+			helper.PrintWithLabel("AfterRequest: "+h.prefix+"["+method+"]", response)
 		}
 	}
 }

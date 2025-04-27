@@ -39,7 +39,6 @@ func GetMcpHost() *wnmcp.Host {
 		return nil
 	}
 
-	defer host.Close()
 	return host
 }
 
