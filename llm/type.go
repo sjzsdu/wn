@@ -23,9 +23,18 @@ type CompletionRequest struct {
 
 // CompletionResponse 表示大模型的响应
 type CompletionResponse struct {
-	Content      string `json:"content"`
-	FinishReason string `json:"finish_reason"`
-	Usage        Usage  `json:"usage"`
+	Content      string     `json:"content"`
+	FinishReason string     `json:"finish_reason"`
+	Usage        Usage      `json:"usage"`
+	ToolCalls    []ToolCall `json:"tool_calls,omitempty"`
+}
+
+// ToolCall 表示工具调用的信息
+type ToolCall struct {
+	ID        string                 `json:"id"`
+	Type      string                 `json:"type"`
+	Function  string                 `json:"function"`
+	Arguments map[string]interface{} `json:"arguments"`
 }
 
 // Usage 表示token使用情况
@@ -40,6 +49,7 @@ type StreamResponse struct {
 	Content      string
 	FinishReason string
 	Done         bool
+	Response     *CompletionResponse
 }
 
 // StreamHandler 处理流式响应的回调函数

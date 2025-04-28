@@ -3,13 +3,13 @@ package aigc
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/sjzsdu/wn/agent"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/message"
 	"github.com/sjzsdu/wn/share"
+	"github.com/sjzsdu/wn/wnmcp"
 )
 
 // defaultOptions 返回默认的聊天选项
@@ -28,7 +28,7 @@ func defaultOptions() ChatOptions {
 }
 
 // NewChat 创建新的聊天实例
-func NewChat(opts ChatOptions) (*Chat, error) {
+func NewChat(opts ChatOptions, host *wnmcp.Host) (*Chat, error) {
 	// 合并默认选项
 	options := helper.MergeStruct(defaultOptions(), opts)
 
@@ -41,11 +41,11 @@ func NewChat(opts ChatOptions) (*Chat, error) {
 		options:    options,
 		msgManager: message.New(),
 		provider:   provider,
+		host:       host,
 	}, nil
 }
 
-// SendMessage 发送消息并获取响应
-func (c *Chat) SendMessage(ctx context.Context, content string) (string, error) {
+func (c *Chat) Complete(ctx context.Context, content string) (string, error) {
 	msg := &llm.Message{
 		Role:    "user",
 		Content: content,
@@ -66,47 +66,41 @@ func (c *Chat) SendMessage(ctx context.Context, content string) (string, error) 
 			return "", err
 		}
 	}
-
-	var response strings.Builder
 	req := c.options.Request
 	req.Messages = c.getContextMessages()
-
 	// 执行响应前钩子
 	if c.options.Hooks.BeforeResponse != nil {
 		if err := c.options.Hooks.BeforeResponse(ctx, &req); err != nil {
 			return "", err
 		}
 	}
-
-	err := c.provider.CompleteStream(ctx, req, func(resp llm.StreamResponse) {
-		if !resp.Done {
-			response.WriteString(resp.Content)
-		} else {
-			if share.GetDebug() {
-				helper.PrintWithLabel("Stream response", resp, response.String())
-			}
-		}
-	})
-
-	if err != nil {
-		return "", err
+	resp, compErr := c.provider.Complete(ctx, req)
+	if (resp.ToolCalls != nil) && (len(resp.ToolCalls) > 0) && c.host != nil {
+		// var toolRes map[string]string
+		// for _, toolCall := range resp.ToolCalls {
+		// 	toolContent, err := c.host.CallTool(ctx, wnmcp.NewToolCallRequest(toolCall.Function, nil))
+		// 	if err != nil {
+		// 		continue
+		// 	}
+		// 	toolRes[toolCall.Function] = "toolContent.Content"
+		// }
 	}
-
-	responseText := response.String()
-
-	// 执行响应后钩子
 	if c.options.Hooks.AfterResponse != nil {
-		if err := c.options.Hooks.AfterResponse(ctx, responseText); err != nil {
+		if err := c.options.Hooks.AfterResponse(ctx, &req, &resp); err != nil {
 			return "", err
 		}
 	}
-
+	if compErr != nil {
+		return "", compErr
+	}
 	c.msgManager.Append(llm.Message{
 		Role:    "assistant",
-		Content: responseText,
+		Content: resp.Content,
 	})
-
-	return responseText, nil
+	if share.GetDebug() {
+		helper.PrintWithLabel("Completion response", resp)
+	}
+	return resp.Content, nil
 }
 
 func (c *Chat) getContextMessages() []llm.Message {

@@ -87,7 +87,7 @@ func (c *aiCommand) runAI(cmd *cobra.Command, args []string) {
 			MaxTokens:      c.maxTokens,
 			ResponseFormat: "text",
 		},
-	})
+	}, nil)
 	if err != nil {
 		fmt.Printf(lang.T("Failed to initialize chat: %v\n"), err)
 		return

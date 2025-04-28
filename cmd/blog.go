@@ -81,8 +81,9 @@ func runBlog(cmd *cobra.Command, args []string) {
 	chat, err := aigc.NewChat(aigc.ChatOptions{
 		UseAgent: "blog",
 		Hooks: &aigc.Hooks{
-			AfterResponse: func(ctx context.Context, resp string) error {
-				changes, errParse := parseUpdateOperations(resp)
+			AfterResponse: func(ctx context.Context, req *llm.CompletionRequest, resp *llm.CompletionResponse) error {
+				content := resp.Content
+				changes, errParse := parseUpdateOperations(content)
 				if errParse != nil {
 					fmt.Printf("解析响应失败: %v\n", errParse)
 					return errParse
@@ -106,7 +107,7 @@ func runBlog(cmd *cobra.Command, args []string) {
 				return messages
 			},
 		},
-	})
+	}, nil)
 	if err != nil {
 		fmt.Printf("failed to initialize chat: %v\n", err)
 		return
@@ -187,12 +188,12 @@ func getBlogMessages(content string) []llm.Message {
 func createBlogMeta() string {
 	chat, err := aigc.NewChat(aigc.ChatOptions{
 		UseAgent: "blog-meta",
-	})
+	}, nil)
 	if err != nil {
 		fmt.Printf("failed to initialize chat: %v\n", err)
 		return metaString("")
 	}
-	content, err := chat.SendMessage(context.Background(), blogContent)
+	content, err := chat.Complete(context.Background(), blogContent)
 	if err != nil {
 		fmt.Printf("failed to initialize chat: %v\n", err)
 		return metaString("")

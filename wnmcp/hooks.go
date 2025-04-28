@@ -33,11 +33,15 @@ func (h *LogHook) BeforeRequest(ctx context.Context, method string, args interfa
 func (h *LogHook) AfterRequest(ctx context.Context, method string, response interface{}, err error) {
 	if err != nil {
 		if share.GetDebug() {
-			helper.PrintWithLabel("AfterRequest: "+h.prefix+"["+method+"]", err)
+			if err != nil {
+				helper.PrintWithLabel("AfterRequest: "+h.prefix+"["+method+"]", err)
+			}
 		}
 	} else {
 		if share.GetDebug() {
-			helper.PrintWithLabel("AfterRequest: "+h.prefix+"["+method+"]", response)
+			if response != nil {
+				helper.PrintWithLabel("AfterRequest: "+h.prefix+"["+method+"]", response)
+			}
 		}
 	}
 }

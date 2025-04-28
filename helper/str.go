@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"encoding/json"
 	"math/rand"
 	"regexp"
 	"strings"
@@ -58,4 +59,13 @@ func SubString(str string, count int) string {
 		return string(runes[:count]) + "..."
 	}
 	return str
+}
+
+// StringToMap 将字符串转换为 map[string]interface{}
+func StringToMap(s string) map[string]interface{} {
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(s), &result); err != nil {
+		return make(map[string]interface{})
+	}
+	return result
 }

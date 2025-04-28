@@ -5,6 +5,7 @@ import (
 
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/message"
+	"github.com/sjzsdu/wn/wnmcp"
 )
 
 // Hooks 定义聊天过程中的各个生命周期钩子
@@ -16,7 +17,7 @@ type Hooks struct {
 	// 接收响应前的钩子
 	BeforeResponse func(ctx context.Context, req *llm.CompletionRequest) error
 	// 接收响应后的钩子
-	AfterResponse func(ctx context.Context, resp string) error
+	AfterResponse func(ctx context.Context, req *llm.CompletionRequest, resp *llm.CompletionResponse) error
 	// 获取上下文消息时的钩子
 	BeforeGetContext func(ctx context.Context, agentMessages []llm.Message, historyMessages []llm.Message) []llm.Message
 }
@@ -35,4 +36,5 @@ type Chat struct {
 	options    ChatOptions
 	msgManager *message.Manager
 	provider   llm.Provider
+	host       *wnmcp.Host
 }

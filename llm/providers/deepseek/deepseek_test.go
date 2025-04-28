@@ -1,6 +1,7 @@
 package deepseek
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -111,7 +112,7 @@ func TestHandleRequestBody(t *testing.T) {
 				},
 				"model": "deepseek-chat",
 			},
-			wantType: "*deepseek.CompletionRequestBody",
+			wantType: "*deepseek.DeepseekRequest",
 		},
 		{
 			name: "带工具的请求体转换",
@@ -140,7 +141,7 @@ func TestHandleRequestBody(t *testing.T) {
 					{Role: "user", Content: "hello"},
 				},
 			},
-			wantType: "*deepseek.CompletionRequestBody",
+			wantType: "*deepseek.DeepseekRequest",
 		},
 		{
 			name: "带单路径工具的请求体转换",
@@ -169,7 +170,7 @@ func TestHandleRequestBody(t *testing.T) {
 					{Role: "user", Content: "hello"},
 				},
 			},
-			wantType: "*deepseek.CompletionRequestBody",
+			wantType: "*deepseek.DeepseekRequest",
 		},
 		{
 			name: "带多路径工具的请求体转换",
@@ -201,7 +202,7 @@ func TestHandleRequestBody(t *testing.T) {
 					{Role: "user", Content: "hello"},
 				},
 			},
-			wantType: "*deepseek.CompletionRequestBody",
+			wantType: "*deepseek.DeepseekRequest",
 		},
 		{
 			name: "带编辑工具的请求体转换",
@@ -252,7 +253,7 @@ func TestHandleRequestBody(t *testing.T) {
 					{Role: "user", Content: "hello"},
 				},
 			},
-			wantType: "*deepseek.CompletionRequestBody",
+			wantType: "*deepseek.DeepseekRequest",
 		},
 	}
 
@@ -260,10 +261,10 @@ func TestHandleRequestBody(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := p.HandleRequestBody(tt.req, tt.reqBody)
 			assert.NotNil(t, result)
-			assert.IsType(t, &CompletionRequestBody{}, result)
+			assert.IsType(t, &DeepseekRequest{}, result)
 
 			// 检查转换后的结构体
-			reqBody := result.(*CompletionRequestBody)
+			reqBody := result.(*DeepseekRequest)
 
 			// 验证消息是否正确转换
 			if len(tt.req.Messages) > 0 {
@@ -460,6 +461,73 @@ func TestHandleTools(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := p.handleTools(tt.tools)
 			assert.Equal(t, tt.expected, result, "工具转换结果不匹配")
+		})
+	}
+}
+
+func TestParseResponse(t *testing.T) {
+	p := &Provider{}
+	tests := []struct {
+		name     string
+		response string
+		want     llm.CompletionResponse
+		wantErr  bool
+	}{
+		{
+			name: "普通响应",
+			response: `{
+				"id": "31d0f92e-5cac-43eb-b98a-982a6dbb1dd1",
+				"object": "chat.completion",
+				"created": 1745843257,
+				"model": "deepseek-chat",
+				"choices": [
+					{
+						"index": 0,
+						"message": {
+							"role": "assistant",
+							"content": ""
+						},
+						"logprobs": null,
+						"finish_reason": "stop"
+					}
+				],
+				"usage": {
+					"prompt_tokens": 1621,
+					"completion_tokens": 56,
+					"total_tokens": 1677,
+					"prompt_tokens_details": {
+						"cached_tokens": 1600
+					},
+					"prompt_cache_hit_tokens": 1600,
+					"prompt_cache_miss_tokens": 21
+				},
+				"system_fingerprint": "fp_8802369eaa_prod0425fp8"
+			}`,
+			want: llm.CompletionResponse{
+				Content:      "",
+				FinishReason: "stop",
+				Usage: llm.Usage{
+					PromptTokens:     1621,
+					CompletionTokens: 56,
+					TotalTokens:      1677,
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := strings.NewReader(tt.response)
+			got, err := p.ParseResponse(reader)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want.Content, got.Content)
+			assert.Equal(t, tt.want.FinishReason, got.FinishReason)
+			assert.Equal(t, tt.want.Usage, got.Usage)
 		})
 	}
 }

@@ -62,7 +62,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 // Complete 实现完整的请求处理
 func (p *Provider) prepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
 	reqBody := p.Provider.CommonRequest(req)
-	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
+	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*DeepseekRequest)
 	reqBodyStruct.Stream = stream
 
 	if share.GetDebug() {
@@ -103,7 +103,7 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 }
 
 func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
-	request, _ := helper.MapToStruct[CompletionRequestBody](reqBody)
+	request, _ := helper.MapToStruct[DeepseekRequest](reqBody)
 	request.Tools = p.handleTools(req.Tools)
 	request.ResponseFormat = ResponseFormat{
 		Type: req.ResponseFormat,
@@ -119,6 +119,8 @@ func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[stri
 func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error {
 	reader := bufio.NewReader(body)
 	var fullContent strings.Builder
+	var toolCalls []llm.ToolCall
+	var usage llm.Usage
 
 	for {
 		line, err := reader.ReadString('\n')
@@ -129,6 +131,12 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 					Content:      fullContent.String(),
 					FinishReason: "done",
 					Done:         true,
+					Response: &llm.CompletionResponse{
+						Content:      fullContent.String(),
+						FinishReason: "done",
+						ToolCalls:    toolCalls,
+						Usage:        usage,
+					},
 				})
 				break
 			}
@@ -146,26 +154,58 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 		}
 
 		data := strings.TrimPrefix(line, "data: ")
-		content, finishReason, err := p.ParseStreamResponse(data)
-		if err != nil {
-			return fmt.Errorf("parse stream response: %w", err)
+		var streamResp StreamResponse
+		if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+			return fmt.Errorf("unmarshal stream response: %w", err)
 		}
 
-		if content != "" {
-			fullContent.WriteString(content)
-			handler(llm.StreamResponse{
-				Content: content,
-				Done:    false,
-			})
-		}
+		if len(streamResp.Choices) > 0 {
+			choice := streamResp.Choices[0]
 
-		if finishReason != "" {
-			handler(llm.StreamResponse{
-				Content:      fullContent.String(),
-				FinishReason: finishReason,
-				Done:         true,
-			})
-			break
+			// 处理内容
+			if choice.Delta.Content != "" {
+				fullContent.WriteString(choice.Delta.Content)
+				handler(llm.StreamResponse{
+					Content: choice.Delta.Content,
+					Done:    false,
+				})
+			}
+
+			// 处理工具调用
+			if len(choice.Delta.ToolCalls) > 0 {
+				for _, tc := range choice.Delta.ToolCalls {
+					toolCalls = append(toolCalls, llm.ToolCall{
+						ID:        tc.ID,
+						Type:      tc.Type,
+						Function:  tc.Function.Name,
+						Arguments: helper.StringToMap(tc.Function.Arguments),
+					})
+				}
+			}
+
+			// 处理结束原因
+			if choice.FinishReason != "" {
+				if streamResp.Usage.TotalTokens > 0 {
+					usage = llm.Usage{
+						PromptTokens:     streamResp.Usage.PromptTokens,
+						CompletionTokens: streamResp.Usage.CompletionTokens,
+						TotalTokens:      streamResp.Usage.TotalTokens,
+					}
+				}
+
+				handler(llm.StreamResponse{
+					Content:      fullContent.String(),
+					FinishReason: choice.FinishReason,
+					Done:         true,
+					Response: &llm.CompletionResponse{
+						Content:      fullContent.String(),
+						FinishReason: choice.FinishReason,
+						ToolCalls:    toolCalls,
+						Usage:        usage,
+					},
+				})
+				break
+			}
 		}
 	}
 
@@ -203,25 +243,59 @@ func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
 }
 
 func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error) {
-	var deepseekResp DeepseekResponse
+	bodyBytes, err := io.ReadAll(body)
+	if err != nil {
+		return llm.CompletionResponse{}, fmt.Errorf("read response body: %w", err)
+	}
 
-	if err := json.NewDecoder(body).Decode(&deepseekResp); err != nil {
-		return llm.CompletionResponse{}, fmt.Errorf("decode response: %w", err)
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Raw Response:", string(bodyBytes))
+	}
+
+	var deepseekResp DeepseekResponse
+	if err := json.Unmarshal(bodyBytes, &deepseekResp); err != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Raw Response Body:", string(bodyBytes))
+			helper.PrintWithLabel("[DEBUG] Unmarshal Error:", err)
+		}
+		return llm.CompletionResponse{}, fmt.Errorf("decode response: %w, raw response: %s", err, string(bodyBytes))
 	}
 
 	if len(deepseekResp.Choices) == 0 {
 		return llm.CompletionResponse{}, fmt.Errorf("no choices in response")
 	}
 
-	return llm.CompletionResponse{
-		Content:      deepseekResp.Choices[0].Message.Content,
-		FinishReason: deepseekResp.Choices[0].FinishReason,
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Deepseek Response:", deepseekResp)
+	}
+
+	choice := deepseekResp.Choices[0]
+	resp := llm.CompletionResponse{
+		Content:      choice.Message.Content,
+		FinishReason: choice.FinishReason,
 		Usage: llm.Usage{
 			PromptTokens:     deepseekResp.Usage.PromptTokens,
 			CompletionTokens: deepseekResp.Usage.CompletionTokens,
 			TotalTokens:      deepseekResp.Usage.TotalTokens,
 		},
-	}, nil
+	}
+
+	// 如果是工具调用，则处理工具调用的响应
+	if choice.Message.ToolCalls != nil && len(choice.Message.ToolCalls) > 0 {
+		toolCalls := make([]llm.ToolCall, len(choice.Message.ToolCalls))
+		for i, tc := range choice.Message.ToolCalls {
+			toolCalls[i] = llm.ToolCall{
+				ID:        tc.ID,
+				Type:      tc.Type,
+				Function:  tc.Function.Name,
+				Arguments: helper.StringToMap(tc.Function.Arguments),
+			}
+		}
+		resp.Content = ""
+		resp.ToolCalls = toolCalls
+	}
+
+	return resp, nil
 }
 
 func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {

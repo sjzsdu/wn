@@ -62,7 +62,7 @@ func runproject(cmd *cobra.Command, args []string) {
 			MaxTokens:      0,  // 使用默认 token 限制
 			ResponseFormat: "text",
 		},
-	})
+	}, nil)
 	if err != nil {
 		fmt.Printf("failed to initialize chat: %v\n", err)
 		return

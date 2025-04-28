@@ -11,7 +11,7 @@ func TestCompletionRequestBody(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		expected CompletionRequestBody
+		expected DeepseekRequest
 		wantErr  bool
 	}{
 		{
@@ -30,7 +30,7 @@ func TestCompletionRequestBody(t *testing.T) {
 				"model": "deepseek-chat",
 				"max_tokens": 8192
 			}`,
-			expected: CompletionRequestBody{
+			expected: DeepseekRequest{
 				Messages: []Message{
 					{
 						Role:    "system",
@@ -53,9 +53,9 @@ func TestCompletionRequestBody(t *testing.T) {
 				"model": "deepseek-chat",
 				"max_tokens": 100
 			}`,
-			expected: CompletionRequestBody{
+			expected: DeepseekRequest{
 				Messages:  []Message{},
-				Model:    "deepseek-chat",
+				Model:     "deepseek-chat",
 				MaxTokens: 100,
 			},
 			wantErr: false,
@@ -65,7 +65,7 @@ func TestCompletionRequestBody(t *testing.T) {
 			input: `{
 				"max_tokens": 100
 			}`,
-			expected: CompletionRequestBody{
+			expected: DeepseekRequest{
 				MaxTokens: 100,
 			},
 			wantErr: false, // Go的JSON解析不会验证必填字段
@@ -74,7 +74,7 @@ func TestCompletionRequestBody(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var got CompletionRequestBody
+			var got DeepseekRequest
 			err := json.Unmarshal([]byte(tt.input), &got)
 
 			if tt.wantErr {

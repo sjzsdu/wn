@@ -66,11 +66,23 @@ func (c *Chat) StartInteractiveSession(ctx context.Context, opts InteractiveOpti
 }
 
 func (c *Chat) processInteraction(ctx context.Context, input string, opts InteractiveOptions) error {
+
 	if input != "" {
-		c.msgManager.Append(llm.Message{
+		msg := &llm.Message{
 			Role:    "user",
 			Content: input,
-		})
+		}
+		if c.options.Hooks.BeforeSend != nil {
+			if err := c.options.Hooks.BeforeSend(ctx, msg); err != nil {
+				return err
+			}
+		}
+		c.msgManager.Append(*msg)
+		if c.options.Hooks.AfterSend != nil {
+			if err := c.options.Hooks.AfterSend(ctx, msg); err != nil {
+				return err
+			}
+		}
 	}
 
 	responseStarted := false
@@ -84,6 +96,13 @@ func (c *Chat) processInteraction(ctx context.Context, input string, opts Intera
 		req := c.options.Request
 		req.Messages = c.getContextMessages()
 
+		// 执行响应前钩子
+		if c.options.Hooks.BeforeResponse != nil {
+			if err := c.options.Hooks.BeforeResponse(ctx, &req); err != nil {
+				return
+			}
+		}
+
 		err := c.provider.CompleteStream(ctx, req, func(resp llm.StreamResponse) {
 			if !responseStarted {
 				loadingDone <- true
@@ -92,16 +111,13 @@ func (c *Chat) processInteraction(ctx context.Context, input string, opts Intera
 			}
 			if !resp.Done {
 				fullContent.WriteString(resp.Content)
-				if share.GetDebug() {
-					helper.PrintWithLabel("Stream response", resp)
-				}
 				if err := opts.Renderer.WriteStream(resp.Content); err != nil {
 					fmt.Print(resp.Content)
 				}
 			} else {
 				opts.Renderer.Done()
 				if c.options.Hooks.AfterResponse != nil {
-					c.options.Hooks.AfterResponse(ctx, fullContent.String())
+					c.options.Hooks.AfterResponse(ctx, &req, resp.Response)
 				}
 				c.msgManager.Append(llm.Message{
 					Role:    "assistant",

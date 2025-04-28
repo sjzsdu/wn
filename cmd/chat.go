@@ -5,7 +5,6 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sjzsdu/wn/aigc"
-	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/spf13/cobra"
 )
@@ -35,13 +34,13 @@ func runChat(cmd *cobra.Command, args []string) {
 	tools := host.GetTools(context.Background(), mcp.ListToolsRequest{})
 	chatOption := GetChatOptions()
 	chatOption.Request.Tools = tools
-	chat, _ := aigc.NewChat(*chatOption)
+	chat, _ := aigc.NewChat(*chatOption, host)
 	// 启动交互式会话
 	ctx := context.Background()
-	// chat.SendMessage(ctx, "当前有多少文件")
-	chat.StartInteractiveSession(ctx, aigc.InteractiveOptions{
-		Renderer: helper.GetDefaultRenderer(),
-		Debug:    false,
-	})
+	chat.Complete(ctx, "当前项目有多少文件")
+	// chat.StartInteractiveSession(ctx, aigc.InteractiveOptions{
+	// 	Renderer: helper.GetDefaultRenderer(),
+	// 	Debug:    false,
+	// })
 
 }
