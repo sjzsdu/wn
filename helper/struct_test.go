@@ -70,6 +70,60 @@ func TestMapToStruct(t *testing.T) {
 			want:    &TestStruct{},
 			wantErr: false,
 		},
+		{
+			name: "嵌套结构体字段缺失",
+			input: map[string]interface{}{
+				"name": "李四",
+				"age":  30,
+				"hobbies": []string{
+					"跑步",
+					"游泳",
+				},
+				"info": map[string]interface{}{
+					"city": "上海",
+				},
+			},
+			want: &TestStruct{
+				Name: "李四",
+				Age:  30,
+				Hobbies: []string{
+					"跑步",
+					"游泳",
+				},
+				Info: struct {
+					City    string `json:"city"`
+					Country string `json:"country"`
+				}{
+					City: "上海",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "数组字段为空",
+			input: map[string]interface{}{
+				"name": "王五",
+				"age":  35,
+				"hobbies": []string{},
+				"info": map[string]interface{}{
+					"city":    "广州",
+					"country": "中国",
+				},
+			},
+			want: &TestStruct{
+				Name:    "王五",
+				Age:     35,
+				Hobbies: []string{},
+				Info: struct {
+					City    string `json:"city"`
+					Country string `json:"country"`
+				}{
+					City:    "广州",
+					Country: "中国",
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

@@ -9,6 +9,7 @@ import (
 	"github.com/sjzsdu/wn/helper/renders"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
+	"github.com/sjzsdu/wn/share"
 )
 
 type InteractiveOptions struct {
@@ -91,6 +92,9 @@ func (c *Chat) processInteraction(ctx context.Context, input string, opts Intera
 			}
 			if !resp.Done {
 				fullContent.WriteString(resp.Content)
+				if share.GetDebug() {
+					helper.PrintWithLabel("Stream response", resp)
+				}
 				if err := opts.Renderer.WriteStream(resp.Content); err != nil {
 					fmt.Print(resp.Content)
 				}
@@ -103,6 +107,9 @@ func (c *Chat) processInteraction(ctx context.Context, input string, opts Intera
 					Role:    "assistant",
 					Content: fullContent.String(),
 				})
+				if share.GetDebug() {
+					helper.PrintWithLabel("Stream response", resp, fullContent.String())
+				}
 			}
 		})
 		completed <- err

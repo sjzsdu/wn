@@ -18,6 +18,7 @@ func defaultOptions() ChatOptions {
 		ProviderName: "",
 		MessageLimit: 2,
 		Hooks:        &Hooks{},
+		UseAgent:     share.DEFAULT_LLM_AGENT,
 		Request: llm.CompletionRequest{
 			Model:          "",
 			MaxTokens:      0,
@@ -26,30 +27,10 @@ func defaultOptions() ChatOptions {
 	}
 }
 
-// mergeOptions 合并选项，后面的选项会覆盖前面的选项的非零值
-func mergeOptions(base, override ChatOptions) ChatOptions {
-	if override.ProviderName != "" {
-		base.ProviderName = override.ProviderName
-	}
-	if override.Request.Model != "" {
-		base.Request.Model = override.Request.Model
-	}
-	if override.Request.MaxTokens != 0 {
-		base.Request.MaxTokens = override.Request.MaxTokens
-	}
-	if override.Request.ResponseFormat != "" {
-		base.Request.ResponseFormat = override.Request.ResponseFormat
-	}
-	if override.Request.Tools != nil {
-		base.Request.Tools = override.Request.Tools
-	}
-	return base
-}
-
 // NewChat 创建新的聊天实例
 func NewChat(opts ChatOptions) (*Chat, error) {
 	// 合并默认选项
-	options := mergeOptions(defaultOptions(), opts)
+	options := helper.MergeStruct(defaultOptions(), opts)
 
 	provider, err := llm.GetProvider(options.ProviderName, nil)
 	if err != nil {
@@ -100,6 +81,10 @@ func (c *Chat) SendMessage(ctx context.Context, content string) (string, error) 
 	err := c.provider.CompleteStream(ctx, req, func(resp llm.StreamResponse) {
 		if !resp.Done {
 			response.WriteString(resp.Content)
+		} else {
+			if share.GetDebug() {
+				helper.PrintWithLabel("Stream response", resp, response.String())
+			}
 		}
 	})
 

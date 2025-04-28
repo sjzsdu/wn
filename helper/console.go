@@ -7,13 +7,27 @@ import (
 )
 
 // PrintWithLabel 带标签的打印，方便调试时识别输出内容
-func PrintWithLabel(label string, v interface{}) {
-	fmt.Printf("[%s]: ", label)
-	if v == nil {
-		fmt.Println("nil")
-		return
-	}
-	Print(v)
+func PrintWithLabel(label string, v ...interface{}) {
+    fmt.Printf("[%s]: ", label)
+    if len(v) == 0 {
+        fmt.Println("nil")
+        return
+    }
+    
+    if len(v) == 1 {
+        Print(v[0])
+        return
+    }
+    
+    // 处理多个参数
+    fmt.Print("[ ")
+    for i, item := range v {
+        if i > 0 {
+            fmt.Print(", ")
+        }
+        Print(item)
+    }
+    fmt.Println(" ]")
 }
 
 func Print(v interface{}) {

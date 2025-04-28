@@ -60,17 +60,20 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 }
 
 // Complete 实现完整的请求处理
-func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
-
+func (p *Provider) prepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
 	reqBody := p.Provider.CommonRequest(req)
 	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
+	reqBodyStruct.Stream = stream
 
 	if share.GetDebug() {
 		helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
 	}
 
-	jsonBody, err := json.Marshal(reqBodyStruct)
+	return json.Marshal(reqBodyStruct)
+}
 
+func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
+	jsonBody, err := p.prepareRequest(req, false)
 	if err != nil {
 		return llm.CompletionResponse{}, fmt.Errorf("marshal request: %w", err)
 	}
@@ -84,18 +87,8 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm
 	return p.ParseResponse(resp.Body)
 }
 
-// CompleteStream 实现流式请求处理
 func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-
-	reqBody := p.Provider.CommonRequest(req)
-	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
-	reqBodyStruct.Stream = true
-
-	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
-	}
-
-	jsonBody, err := json.Marshal(reqBodyStruct)
+	jsonBody, err := p.prepareRequest(req, true)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
 	}
@@ -111,9 +104,6 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 
 func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
 	request, _ := helper.MapToStruct[CompletionRequestBody](reqBody)
-	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Request Tools:", req.Tools)
-	}
 	request.Tools = p.handleTools(req.Tools)
 	request.ResponseFormat = ResponseFormat{
 		Type: req.ResponseFormat,
@@ -134,12 +124,19 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
+				// 流式响应结束时返回完整数据
+				handler(llm.StreamResponse{
+					Content:      fullContent.String(),
+					FinishReason: "done",
+					Done:         true,
+				})
 				break
 			}
 			return fmt.Errorf("read response: %w", err)
 		}
 
 		line = strings.TrimSpace(line)
+
 		if line == "" || line == "data: [DONE]" {
 			continue
 		}
@@ -206,19 +203,7 @@ func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
 }
 
 func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error) {
-	var deepseekResp struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-			FinishReason string `json:"finish_reason"`
-		} `json:"choices"`
-		Usage struct {
-			PromptTokens     int `json:"prompt_tokens"`
-			CompletionTokens int `json:"completion_tokens"`
-			TotalTokens      int `json:"total_tokens"`
-		} `json:"usage"`
-	}
+	var deepseekResp DeepseekResponse
 
 	if err := json.NewDecoder(body).Decode(&deepseekResp); err != nil {
 		return llm.CompletionResponse{}, fmt.Errorf("decode response: %w", err)
@@ -239,23 +224,27 @@ func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error)
 	}, nil
 }
 
-// ParseStreamResponse 实现流式响应解析
 func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {
-	var streamResp struct {
-		Choices []struct {
-			Delta struct {
-				Content string `json:"content"`
-			} `json:"delta"`
-			FinishReason string `json:"finish_reason"`
-		} `json:"choices"`
-	}
+	var streamResp StreamResponse
 
 	if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
 		return "", "", fmt.Errorf("unmarshal response: %w", err)
 	}
 
+	// if share.GetDebug() {
+	// 	helper.PrintWithLabel("[DEBUG] Stream Response:", streamResp)
+	// }
+
 	if len(streamResp.Choices) == 0 {
-		return "", "", nil
+		return "", "", fmt.Errorf("empty choices in response")
+	}
+
+	// 新增对工具调用的处理
+	if streamResp.Choices[0].FinishReason == "tool_calls" {
+		// if share.GetDebug() {
+		// 	helper.PrintWithLabel("[DEBUG] Tool Calls:", streamResp.Choices[0].Delta.ToolCalls)
+		// }
+		return "", streamResp.Choices[0].FinishReason, nil
 	}
 
 	return streamResp.Choices[0].Delta.Content, streamResp.Choices[0].FinishReason, nil
