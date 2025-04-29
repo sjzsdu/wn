@@ -65,10 +65,9 @@ func (p *Provider) prepareRequest(req llm.CompletionRequest, stream bool) ([]byt
 	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*DeepseekRequest)
 	reqBodyStruct.Stream = stream
 
-	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
-	}
-
+	// if share.GetDebug() {
+	// 	helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
+	// }
 	return json.Marshal(reqBodyStruct)
 }
 
@@ -108,9 +107,10 @@ func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[stri
 	request.ResponseFormat = ResponseFormat{
 		Type: req.ResponseFormat,
 	}
-	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Resolve Tools:", request.Tools)
-	}
+
+	// if share.GetDebug() {
+	// 	helper.PrintWithLabel("[DEBUG] Resolve Tools:", request.Tools)
+	// }
 
 	return request
 }

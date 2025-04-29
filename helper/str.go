@@ -69,3 +69,13 @@ func StringToMap(s string) map[string]interface{} {
 	}
 	return result
 }
+
+// ToJSONString 将任意的 map、slice 或 struct 转换为字符串
+func ToJSONString(v interface{}) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return "{}"
+	}
+	return string(data)
+}
+

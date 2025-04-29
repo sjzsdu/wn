@@ -46,26 +46,29 @@ func NewChat(opts ChatOptions, host *wnmcp.Host) (*Chat, error) {
 }
 
 func (c *Chat) Complete(ctx context.Context, content string) (string, error) {
-	msg := &llm.Message{
-		Role:    "user",
-		Content: content,
-	}
+	if content != "" {
+		msg := &llm.Message{
+			Role:    "user",
+			Content: content,
+		}
 
-	// 执行发送前钩子
-	if c.options.Hooks.BeforeSend != nil {
-		if err := c.options.Hooks.BeforeSend(ctx, msg); err != nil {
-			return "", err
+		// 执行发送前钩子
+		if c.options.Hooks.BeforeSend != nil {
+			if err := c.options.Hooks.BeforeSend(ctx, msg); err != nil {
+				return "", err
+			}
+		}
+
+		c.msgManager.Append(*msg)
+
+		// 执行发送后钩子
+		if c.options.Hooks.AfterSend != nil {
+			if err := c.options.Hooks.AfterSend(ctx, msg); err != nil {
+				return "", err
+			}
 		}
 	}
 
-	c.msgManager.Append(*msg)
-
-	// 执行发送后钩子
-	if c.options.Hooks.AfterSend != nil {
-		if err := c.options.Hooks.AfterSend(ctx, msg); err != nil {
-			return "", err
-		}
-	}
 	req := c.options.Request
 	req.Messages = c.getContextMessages()
 	// 执行响应前钩子
@@ -75,15 +78,24 @@ func (c *Chat) Complete(ctx context.Context, content string) (string, error) {
 		}
 	}
 	resp, compErr := c.provider.Complete(ctx, req)
+	if compErr != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("Completion error", compErr.Error())
+		}
+		return "", compErr
+	}
 	if (resp.ToolCalls != nil) && (len(resp.ToolCalls) > 0) && c.host != nil {
-		// var toolRes map[string]string
-		// for _, toolCall := range resp.ToolCalls {
-		// 	toolContent, err := c.host.CallTool(ctx, wnmcp.NewToolCallRequest(toolCall.Function, nil))
-		// 	if err != nil {
-		// 		continue
-		// 	}
-		// 	toolRes[toolCall.Function] = "toolContent.Content"
-		// }
+		for _, toolCall := range resp.ToolCalls {
+			toolContent, _ := c.host.CallTool(ctx, wnmcp.NewToolCallRequest(toolCall.Function, toolCall.Arguments))
+			helper.PrintWithLabel("Tool call response", toolContent)
+			msg := &llm.Message{
+				Role:       "tool",
+				Content:    wnmcp.ToolCallResultToString(toolContent),
+				ToolCallId: toolCall.ID,
+			}
+			c.msgManager.Append(*msg)
+		}
+		return c.Complete(ctx, "")
 	}
 	if c.options.Hooks.AfterResponse != nil {
 		if err := c.options.Hooks.AfterResponse(ctx, &req, &resp); err != nil {

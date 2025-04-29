@@ -37,7 +37,9 @@ func runChat(cmd *cobra.Command, args []string) {
 	chat, _ := aigc.NewChat(*chatOption, host)
 	// 启动交互式会话
 	ctx := context.Background()
-	chat.Complete(ctx, "当前项目有多少文件")
+	res, _ := chat.Complete(ctx, "/Users/juzhongsun/Codes/gos/wn/wn.mcp.json 这个文件的内容是什么？")
+	println(res)
+
 	// chat.StartInteractiveSession(ctx, aigc.InteractiveOptions{
 	// 	Renderer: helper.GetDefaultRenderer(),
 	// 	Debug:    false,
