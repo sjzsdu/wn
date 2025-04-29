@@ -85,6 +85,12 @@ func (c *Chat) Complete(ctx context.Context, content string) (string, error) {
 		return "", compErr
 	}
 	if (resp.ToolCalls != nil) && (len(resp.ToolCalls) > 0) && c.host != nil {
+		msg := &llm.Message{
+			Role:      "assistant",
+			Content:   "",
+			ToolCalls: resp.ToolCalls,
+		}
+		c.msgManager.Append(*msg)
 		for _, toolCall := range resp.ToolCalls {
 			toolContent, _ := c.host.CallTool(ctx, wnmcp.NewToolCallRequest(toolCall.Function, toolCall.Arguments))
 			helper.PrintWithLabel("Tool call response", toolContent)

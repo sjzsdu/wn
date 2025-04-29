@@ -80,7 +80,6 @@ func (p *Provider) CommonRequest(req llm.CompletionRequest) map[string]interface
 
 	reqBody := map[string]interface{}{
 		"model":      req.Model,
-		"messages":   req.Messages,
 		"max_tokens": req.MaxTokens,
 	}
 

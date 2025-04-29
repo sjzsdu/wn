@@ -1,9 +1,7 @@
 package deepseek
 
-import "github.com/sjzsdu/wn/llm"
-
 type DeepseekRequest struct {
-	Messages         []llm.Message  `json:"messages"`
+	Messages         []Message      `json:"messages"`
 	Model            string         `json:"model"`
 	FrequencyPenalty float64        `json:"frequency_penalty,omitempty"`
 	MaxTokens        int            `json:"max_tokens,omitempty"`
@@ -24,6 +22,7 @@ type Message struct {
 	Name             string     `json:"name,omitempty"`
 	ReasoningContent string     `json:"reasoning_content,omitempty"`
 	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallId       string     `json:"tool_call_id,omitempty"`
 }
 
 type ResponseFormat struct {

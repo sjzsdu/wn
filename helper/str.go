@@ -78,4 +78,3 @@ func ToJSONString(v interface{}) string {
 	}
 	return string(data)
 }
-

@@ -104,6 +104,7 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
 	request, _ := helper.MapToStruct[DeepseekRequest](reqBody)
 	request.Tools = p.handleTools(req.Tools)
+	request.Messages = p.handleMessages(req.Messages)
 	request.ResponseFormat = ResponseFormat{
 		Type: req.ResponseFormat,
 	}
@@ -239,6 +240,36 @@ func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
 		result = append(result, dsTool)
 	}
 
+	return result
+}
+
+func (p *Provider) handleMessages(messages []llm.Message) []Message {
+	result := make([]Message, 0, len(messages))
+	for _, msg := range messages {
+		// 转换工具调用
+		var toolCalls []ToolCall
+		if msg.ToolCalls != nil {
+			toolCalls = make([]ToolCall, 0)
+			for _, tc := range msg.ToolCalls {
+				toolCalls = append(toolCalls, ToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: CallFunction{
+						Name:      tc.Function,
+						Arguments: helper.ToJSONString(tc.Arguments),
+					},
+				})
+			}
+		}
+
+		result = append(result, Message{
+			Role:       msg.Role,
+			Content:    msg.Content,
+			Name:       msg.Name,
+			ToolCallId: msg.ToolCallId,
+			ToolCalls:  toolCalls,
+		})
+	}
 	return result
 }
 
