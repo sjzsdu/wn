@@ -10,6 +10,7 @@ import (
 	"github.com/sjzsdu/wn/lang"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/share"
+	"github.com/sjzsdu/wn/wnmcp"
 )
 
 type InteractiveOptions struct {
@@ -116,6 +117,37 @@ func (c *Chat) processInteraction(ctx context.Context, input string, opts Intera
 				}
 			} else {
 				opts.Renderer.Done()
+				if share.GetDebug() {
+					helper.PrintWithLabel("Stream response", resp.Response)
+				}
+				// 检查是否有工具调用
+				if (resp.Response.ToolCalls != nil) && (len(resp.Response.ToolCalls) > 0) && c.host != nil {
+					msg := &llm.Message{
+						Role:      "assistant",
+						Content:   "",
+						ToolCalls: resp.Response.ToolCalls,
+					}
+					c.msgManager.Append(*msg)
+					for _, toolCall := range resp.Response.ToolCalls {
+						helper.PrintWithLabel("Tool call", toolCall)
+						toolContent, _ := c.host.CallTool(ctx, wnmcp.NewToolCallRequest(toolCall.Function, toolCall.Arguments))
+						toolResult := wnmcp.ToolCallResultToString(toolContent)
+						helper.PrintWithLabel("Tool call result", toolResult)
+						msg := &llm.Message{
+							Role:       "tool",
+							Content:    toolResult,
+							ToolCallId: toolCall.ID,
+						}
+						c.msgManager.Append(*msg)
+					}
+					// 递归调用以获取最终响应
+					if err := c.processInteraction(ctx, "", opts); err != nil {
+						completed <- err
+						return
+					}
+					return
+				}
+
 				if c.options.Hooks.AfterResponse != nil {
 					c.options.Hooks.AfterResponse(ctx, &req, resp.Response)
 				}
@@ -123,9 +155,6 @@ func (c *Chat) processInteraction(ctx context.Context, input string, opts Intera
 					Role:    "assistant",
 					Content: fullContent.String(),
 				})
-				if share.GetDebug() {
-					helper.PrintWithLabel("Stream response", resp, fullContent.String())
-				}
 			}
 		})
 		completed <- err

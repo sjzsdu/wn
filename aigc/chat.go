@@ -93,7 +93,9 @@ func (c *Chat) Complete(ctx context.Context, content string) (string, error) {
 		c.msgManager.Append(*msg)
 		for _, toolCall := range resp.ToolCalls {
 			toolContent, _ := c.host.CallTool(ctx, wnmcp.NewToolCallRequest(toolCall.Function, toolCall.Arguments))
-			helper.PrintWithLabel("Tool call response", toolContent)
+			if share.GetDebug() {
+				helper.PrintWithLabel("Tool call", toolCall, toolContent)
+			}
 			msg := &llm.Message{
 				Role:       "tool",
 				Content:    wnmcp.ToolCallResultToString(toolContent),

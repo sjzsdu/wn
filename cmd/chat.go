@@ -5,6 +5,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sjzsdu/wn/aigc"
+	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/lang"
 	"github.com/spf13/cobra"
 )
@@ -37,12 +38,11 @@ func runChat(cmd *cobra.Command, args []string) {
 	chat, _ := aigc.NewChat(*chatOption, host)
 	// 启动交互式会话
 	ctx := context.Background()
-	res, _ := chat.Complete(ctx, "/Users/juzhongsun/Codes/gos/wn/wn.mcp.json 这个文件的内容是什么？")
-	println(res)
+	// res, _ := chat.Complete(ctx, "mkdocs.yml 这个文件中写了什么东西？")
+	// println(res)
 
-	// chat.StartInteractiveSession(ctx, aigc.InteractiveOptions{
-	// 	Renderer: helper.GetDefaultRenderer(),
-	// 	Debug:    false,
-	// })
-
+	chat.StartInteractiveSession(ctx, aigc.InteractiveOptions{
+		Renderer: helper.GetDefaultRenderer(),
+		Debug:    false,
+	})
 }

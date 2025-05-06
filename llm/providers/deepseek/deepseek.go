@@ -123,10 +123,19 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 	var toolCalls []llm.ToolCall
 	var usage llm.Usage
 
+	// 用于处理工具调用的变量
+	var currentToolCall *llm.ToolCall
+	var argumentsBuilder strings.Builder
+
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
+				// 如果还有未处理完的工具调用，添加到结果中
+				if currentToolCall != nil {
+					currentToolCall.Arguments = helper.StringToMap(argumentsBuilder.String())
+					toolCalls = append(toolCalls, *currentToolCall)
+				}
 				// 流式响应结束时返回完整数据
 				handler(llm.StreamResponse{
 					Content:      fullContent.String(),
@@ -175,17 +184,38 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 			// 处理工具调用
 			if len(choice.Delta.ToolCalls) > 0 {
 				for _, tc := range choice.Delta.ToolCalls {
-					toolCalls = append(toolCalls, llm.ToolCall{
-						ID:        tc.ID,
-						Type:      tc.Type,
-						Function:  tc.Function.Name,
-						Arguments: helper.StringToMap(tc.Function.Arguments),
-					})
+					if tc.ID != "" {
+						// 新的工具调用开始
+						if currentToolCall == nil || currentToolCall.ID != tc.ID {
+							if currentToolCall != nil {
+								// 完成前一个工具调用
+								currentToolCall.Arguments = helper.StringToMap(argumentsBuilder.String())
+								toolCalls = append(toolCalls, *currentToolCall)
+							}
+							// 创建新的工具调用
+							currentToolCall = &llm.ToolCall{
+								ID:       tc.ID,
+								Type:     tc.Type,
+								Function: tc.Function.Name,
+							}
+							argumentsBuilder.Reset()
+						}
+					}
+					// 累积参数字符串
+					if tc.Function.Arguments != "" {
+						argumentsBuilder.WriteString(tc.Function.Arguments)
+					}
 				}
 			}
 
 			// 处理结束原因
 			if choice.FinishReason != "" {
+				// 处理最后一个工具调用
+				if choice.FinishReason == "tool_calls" && currentToolCall != nil {
+					currentToolCall.Arguments = helper.StringToMap(argumentsBuilder.String())
+					toolCalls = append(toolCalls, *currentToolCall)
+				}
+
 				if streamResp.Usage.TotalTokens > 0 {
 					usage = llm.Usage{
 						PromptTokens:     streamResp.Usage.PromptTokens,
@@ -336,23 +366,25 @@ func (p *Provider) ParseStreamResponse(data string) (content string, finishReaso
 		return "", "", fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	// if share.GetDebug() {
-	// 	helper.PrintWithLabel("[DEBUG] Stream Response:", streamResp)
-	// }
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Stream Response", streamResp)
+	}
 
 	if len(streamResp.Choices) == 0 {
 		return "", "", fmt.Errorf("empty choices in response")
 	}
 
-	// 新增对工具调用的处理
-	if streamResp.Choices[0].FinishReason == "tool_calls" {
-		// if share.GetDebug() {
-		// 	helper.PrintWithLabel("[DEBUG] Tool Calls:", streamResp.Choices[0].Delta.ToolCalls)
-		// }
-		return "", streamResp.Choices[0].FinishReason, nil
+	choice := streamResp.Choices[0]
+
+	// 处理工具调用
+	if choice.FinishReason == "tool_calls" && len(choice.Delta.ToolCalls) > 0 {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Tool Calls", choice.Delta.ToolCalls)
+		}
+		return "", choice.FinishReason, nil
 	}
 
-	return streamResp.Choices[0].Delta.Content, streamResp.Choices[0].FinishReason, nil
+	return choice.Delta.Content, choice.FinishReason, nil
 }
 
 func init() {
