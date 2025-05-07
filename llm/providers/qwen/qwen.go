@@ -1,4 +1,4 @@
-package claude
+package qwen
 
 import (
 	"bufio"
@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	name               = "claude"
-	defaultAPIEndpoint = "https://api.anthropic.com/v1/messages"
+	name               = "qwen"
+	defaultAPIEndpoint = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
 )
 
 type Provider struct {
@@ -28,7 +28,7 @@ type Provider struct {
 func New(options map[string]interface{}) (llm.Provider, error) {
 	p := &Provider{
 		Provider: base.Provider{
-			Model:     "claude-2",
+			Model:     "qwen-turbo",
 			Pname:     name,
 			MaxTokens: share.MAX_TOKENS,
 			HTTPHandler: base.HTTPHandler{
@@ -38,16 +38,16 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 		},
 	}
 
-	apiKey, ok := options["WN_CLAUDE_APIKEY"].(string)
+	apiKey, ok := options["WN_QWEN_APIKEY"].(string)
 	if !ok || apiKey == "" {
-		return nil, fmt.Errorf("claude: WN_CLAUDE_APIKEY is required")
+		return nil, fmt.Errorf("qwen: WN_QWEN_APIKEY is required")
 	}
 	p.APIKey = apiKey
 
-	if endpoint, ok := options["WN_CLAUDE_ENDPOINT"].(string); ok && endpoint != "" {
+	if endpoint, ok := options["WN_QWEN_ENDPOINT"].(string); ok && endpoint != "" {
 		p.APIEndpoint = endpoint
 	}
-	if model, ok := options["WN_CLAUDE_MODEL"].(string); ok {
+	if model, ok := options["WN_QWEN_MODEL"].(string); ok {
 		p.Model = model
 	}
 
@@ -148,56 +148,62 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 }
 
 func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error) {
-	var claudeResp struct {
-		Content []struct {
-			Text string `json:"text"`
-		} `json:"content"`
-		StopReason string `json:"stop_reason"`
-		Usage      struct {
+	var qwenResp struct {
+		Output struct {
+			Text         string     `json:"text"`
+			ToolCalls    []ToolCall `json:"tool_calls"`
+			FinishReason string     `json:"finish_reason"`
+		} `json:"output"`
+		Usage struct {
 			InputTokens  int `json:"input_tokens"`
 			OutputTokens int `json:"output_tokens"`
 		} `json:"usage"`
 	}
 
-	if err := json.NewDecoder(body).Decode(&claudeResp); err != nil {
+	if err := json.NewDecoder(body).Decode(&qwenResp); err != nil {
 		return llm.CompletionResponse{}, fmt.Errorf("decode response: %w", err)
 	}
 
-	if len(claudeResp.Content) == 0 {
-		return llm.CompletionResponse{}, fmt.Errorf("no content in response")
+	resp := llm.CompletionResponse{
+		Content:      qwenResp.Output.Text,
+		FinishReason: qwenResp.Output.FinishReason,
+		Usage: llm.Usage{
+			PromptTokens:     qwenResp.Usage.InputTokens,
+			CompletionTokens: qwenResp.Usage.OutputTokens,
+			TotalTokens:      qwenResp.Usage.InputTokens + qwenResp.Usage.OutputTokens,
+		},
 	}
 
-	return llm.CompletionResponse{
-		Content:      claudeResp.Content[0].Text,
-		FinishReason: claudeResp.StopReason,
-		Usage: llm.Usage{
-			PromptTokens:     claudeResp.Usage.InputTokens,
-			CompletionTokens: claudeResp.Usage.OutputTokens,
-			TotalTokens:      claudeResp.Usage.InputTokens + claudeResp.Usage.OutputTokens,
-		},
-	}, nil
+	if len(qwenResp.Output.ToolCalls) > 0 {
+		toolCalls := make([]llm.ToolCall, len(qwenResp.Output.ToolCalls))
+		for i, tc := range qwenResp.Output.ToolCalls {
+			toolCalls[i] = llm.ToolCall{
+				ID:        tc.ID,
+				Type:      tc.Type,
+				Function:  tc.Function.Name,
+				Arguments: helper.StringToMap(tc.Function.Arguments),
+			}
+		}
+		resp.Content = ""
+		resp.ToolCalls = toolCalls
+	}
+
+	return resp, nil
 }
 
 func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {
 	var streamResp struct {
-		Type    string `json:"type"`
-		Content struct {
-			Text string `json:"text"`
-		} `json:"content"`
-		StopReason string `json:"stop_reason"`
+		Output struct {
+			Text         string `json:"text"`
+			FinishReason string `json:"finish_reason"`
+		} `json:"output"`
 	}
 
 	if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
 		return "", "", fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	if streamResp.Type == "content_block_delta" {
-		return streamResp.Content.Text, "", nil
-	} else if streamResp.Type == "message_delta" {
-		return "", streamResp.StopReason, nil
-	}
-
-	return "", "", nil
+	return streamResp.Output.Text, streamResp.Output.FinishReason, nil
 }
 
 func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
@@ -275,16 +281,16 @@ func init() {
 
 // AvailableModels 通过API获取支持的模型列表
 func (p *Provider) AvailableModels() []string {
-	endpoint := "https://api.anthropic.com/v1/models"
+	endpoint := "https://dashscope.aliyuncs.com/api/v1/models"
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
-		return []string{"claude-2", "claude-instant-1"}
+		return []string{"qwen-turbo", "qwen-plus", "qwen-max"}
 	}
-	req.Header.Set("x-api-key", p.APIKey)
+	req.Header.Set("Authorization", "Bearer "+p.APIKey)
 
 	resp, err := p.Client.Do(req)
 	if err != nil {
-		return []string{"claude-2", "claude-instant-1"}
+		return []string{"qwen-turbo", "qwen-plus", "qwen-max"}
 	}
 	defer resp.Body.Close()
 
@@ -295,12 +301,14 @@ func (p *Provider) AvailableModels() []string {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return []string{"claude-2", "claude-instant-1"}
+		return []string{"qwen-turbo", "qwen-plus", "qwen-max"}
 	}
 
-	models := make([]string, len(response.Models))
-	for i, model := range response.Models {
-		models[i] = model.Name
+	models := make([]string, 0)
+	for _, model := range response.Models {
+		if strings.HasPrefix(model.Name, "qwen") {
+			models = append(models, model.Name)
+		}
 	}
 	return models
 }

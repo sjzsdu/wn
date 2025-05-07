@@ -17,14 +17,6 @@ func TestProvider_Name(t *testing.T) {
 	assert.Equal(t, "test", p.Name())
 }
 
-func TestProvider_AvailableModels(t *testing.T) {
-	models := []string{"model1", "model2"}
-	p := &Provider{
-		Models: models,
-	}
-	assert.Equal(t, models, p.AvailableModels())
-}
-
 func TestProvider_SetModel(t *testing.T) {
 	p := &Provider{
 		Model: "default",

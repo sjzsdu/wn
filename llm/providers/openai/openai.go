@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
@@ -27,7 +28,6 @@ type Provider struct {
 func New(options map[string]interface{}) (llm.Provider, error) {
 	p := &Provider{
 		Provider: base.Provider{
-			Models:    []string{"gpt-3", "gpt-3.5-turbo", "gpt-4"},
 			Model:     "gpt-3.5-turbo",
 			Pname:     name,
 			MaxTokens: share.MAX_TOKENS,
@@ -46,9 +46,6 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 
 	if endpoint, ok := options["WN_OPENAI_ENDPOINT"].(string); ok && endpoint != "" {
 		p.APIEndpoint = endpoint
-	}
-	if models, ok := options["WN_OPENAI_MODELS"].([]string); ok && len(models) > 0 {
-		p.Models = models
 	}
 	if model, ok := options["WN_OPENAI_MODEL"].(string); ok {
 		p.Model = model
@@ -101,11 +98,31 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error {
 	reader := bufio.NewReader(body)
 	var fullContent strings.Builder
+	var toolCalls []llm.ToolCall
+	var usage llm.Usage
+
+	var currentToolCall *llm.ToolCall
+	var argumentsBuilder strings.Builder
 
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
+				if currentToolCall != nil {
+					currentToolCall.Arguments = helper.StringToMap(argumentsBuilder.String())
+					toolCalls = append(toolCalls, *currentToolCall)
+				}
+				handler(llm.StreamResponse{
+					Content:      fullContent.String(),
+					FinishReason: "done",
+					Done:         true,
+					Response: &llm.CompletionResponse{
+						Content:      fullContent.String(),
+						FinishReason: "done",
+						ToolCalls:    toolCalls,
+						Usage:        usage,
+					},
+				})
 				break
 			}
 			return fmt.Errorf("read response: %w", err)
@@ -121,26 +138,85 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 		}
 
 		data := strings.TrimPrefix(line, "data: ")
-		content, finishReason, err := p.ParseStreamResponse(data)
-		if err != nil {
-			return fmt.Errorf("parse stream response: %w", err)
+		var streamResp struct {
+			Choices []struct {
+				Delta struct {
+					Content   string     `json:"content"`
+					ToolCalls []ToolCall `json:"tool_calls"`
+				} `json:"delta"`
+				FinishReason string `json:"finish_reason"`
+			} `json:"choices"`
+			Usage struct {
+				PromptTokens     int `json:"prompt_tokens"`
+				CompletionTokens int `json:"completion_tokens"`
+				TotalTokens      int `json:"total_tokens"`
+			} `json:"usage"`
 		}
 
-		if content != "" {
-			fullContent.WriteString(content)
-			handler(llm.StreamResponse{
-				Content: content,
-				Done:    false,
-			})
+		if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+			return fmt.Errorf("unmarshal stream response: %w", err)
 		}
 
-		if finishReason != "" {
-			handler(llm.StreamResponse{
-				Content:      fullContent.String(),
-				FinishReason: finishReason,
-				Done:         true,
-			})
-			break
+		if len(streamResp.Choices) > 0 {
+			choice := streamResp.Choices[0]
+
+			if choice.Delta.Content != "" {
+				fullContent.WriteString(choice.Delta.Content)
+				handler(llm.StreamResponse{
+					Content: choice.Delta.Content,
+					Done:    false,
+				})
+			}
+
+			if len(choice.Delta.ToolCalls) > 0 {
+				for _, tc := range choice.Delta.ToolCalls {
+					if tc.ID != "" {
+						if currentToolCall == nil || currentToolCall.ID != tc.ID {
+							if currentToolCall != nil {
+								currentToolCall.Arguments = helper.StringToMap(argumentsBuilder.String())
+								toolCalls = append(toolCalls, *currentToolCall)
+							}
+							currentToolCall = &llm.ToolCall{
+								ID:       tc.ID,
+								Type:     tc.Type,
+								Function: tc.Function.Name,
+							}
+							argumentsBuilder.Reset()
+						}
+					}
+					if tc.Function.Arguments != "" {
+						argumentsBuilder.WriteString(tc.Function.Arguments)
+					}
+				}
+			}
+
+			if choice.FinishReason != "" {
+				if choice.FinishReason == "tool_calls" && currentToolCall != nil {
+					currentToolCall.Arguments = helper.StringToMap(argumentsBuilder.String())
+					toolCalls = append(toolCalls, *currentToolCall)
+				}
+
+				if streamResp.Usage.TotalTokens > 0 {
+					usage = llm.Usage{
+						PromptTokens:     streamResp.Usage.PromptTokens,
+						CompletionTokens: streamResp.Usage.CompletionTokens,
+						TotalTokens:      streamResp.Usage.TotalTokens,
+					}
+				}
+
+				handler(llm.StreamResponse{
+					Content:      fullContent.String(),
+					FinishReason: choice.FinishReason,
+					Done:         true,
+					Response: &llm.CompletionResponse{
+						Content:      fullContent.String(),
+						FinishReason: choice.FinishReason,
+						ToolCalls:    toolCalls,
+						Usage:        usage,
+					},
+				})
+				break
+			}
 		}
 	}
 
@@ -151,7 +227,8 @@ func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error)
 	var openAIResp struct {
 		Choices []struct {
 			Message struct {
-				Content string `json:"content"`
+				Content   string     `json:"content"`
+				ToolCalls []ToolCall `json:"tool_calls"`
 			} `json:"message"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
@@ -170,22 +247,41 @@ func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error)
 		return llm.CompletionResponse{}, fmt.Errorf("no choices in response")
 	}
 
-	return llm.CompletionResponse{
-		Content:      openAIResp.Choices[0].Message.Content,
-		FinishReason: openAIResp.Choices[0].FinishReason,
+	choice := openAIResp.Choices[0]
+	resp := llm.CompletionResponse{
+		Content:      choice.Message.Content,
+		FinishReason: choice.FinishReason,
 		Usage: llm.Usage{
 			PromptTokens:     openAIResp.Usage.PromptTokens,
 			CompletionTokens: openAIResp.Usage.CompletionTokens,
 			TotalTokens:      openAIResp.Usage.TotalTokens,
 		},
-	}, nil
+	}
+
+	// 处理工具调用
+	if len(choice.Message.ToolCalls) > 0 {
+		toolCalls := make([]llm.ToolCall, len(choice.Message.ToolCalls))
+		for i, tc := range choice.Message.ToolCalls {
+			toolCalls[i] = llm.ToolCall{
+				ID:        tc.ID,
+				Type:      tc.Type,
+				Function:  tc.Function.Name,
+				Arguments: helper.StringToMap(tc.Function.Arguments),
+			}
+		}
+		resp.Content = ""
+		resp.ToolCalls = toolCalls
+	}
+
+	return resp, nil
 }
 
 func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {
 	var streamResp struct {
 		Choices []struct {
 			Delta struct {
-				Content string `json:"content"`
+				Content   string     `json:"content"`
+				ToolCalls []ToolCall `json:"tool_calls"`
 			} `json:"delta"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
@@ -199,21 +295,122 @@ func (p *Provider) ParseStreamResponse(data string) (content string, finishReaso
 		return "", "", nil
 	}
 
-	return streamResp.Choices[0].Delta.Content, streamResp.Choices[0].FinishReason, nil
+	choice := streamResp.Choices[0]
+
+	// 如果是工具调用，返回空内容和工具调用的完成原因
+	if choice.FinishReason == "tool_calls" {
+		return "", choice.FinishReason, nil
+	}
+
+	return choice.Delta.Content, choice.FinishReason, nil
 }
 
 func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
 	request, _ := helper.MapToStruct[CompletionRequestBody](reqBody)
+	request.Tools = p.handleTools(req.Tools)
+	request.Messages = p.handleMessages(req.Messages)
+	request.ResponseFormat = ResponseFormat{
+		Type: req.ResponseFormat,
+	}
 	return request
 }
 
-type CompletionRequestBody struct {
-	Model     string        `json:"model"`
-	Messages  []llm.Message `json:"messages"`
-	MaxTokens int           `json:"max_tokens"`
-	Stream    bool          `json:"stream"`
+func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
+	if len(tools) == 0 {
+		return nil
+	}
+
+	result := make([]Tool, 0, len(tools))
+	for _, t := range tools {
+		tool := Tool{
+			Type: "function",
+			Function: Function{
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters: map[string]interface{}{
+					"type":       "object",
+					"properties": t.InputSchema.Properties,
+				},
+			},
+		}
+
+		if len(t.InputSchema.Required) > 0 {
+			tool.Function.Parameters["required"] = t.InputSchema.Required
+		}
+
+		result = append(result, tool)
+	}
+
+	return result
+}
+
+func (p *Provider) handleMessages(messages []llm.Message) []Message {
+	result := make([]Message, len(messages))
+	for i, m := range messages {
+		msg := Message{
+			Role:    m.Role,
+			Content: m.Content,
+		}
+
+		if m.ToolCallId != "" {
+			msg.ToolCallID = m.ToolCallId
+			msg.Name = m.Name
+		}
+
+		if len(m.ToolCalls) > 0 {
+			toolCalls := make([]ToolCall, len(m.ToolCalls))
+			for j, tc := range m.ToolCalls {
+				toolCalls[j] = ToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: CallFunction{
+						Name:      tc.Function,
+						Arguments: helper.ToJSONString(tc.Arguments),
+					},
+				}
+			}
+			msg.ToolCalls = toolCalls
+		}
+
+		result[i] = msg
+	}
+	return result
 }
 
 func init() {
 	llm.Register(name, New)
+}
+
+// AvailableModels 通过API获取支持的模型列表
+func (p *Provider) AvailableModels() []string {
+	endpoint := "https://api.openai.com/v1/models"
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return []string{"gpt-3.5-turbo", "gpt-4"}
+	}
+	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+
+	resp, err := p.Client.Do(req)
+	if err != nil {
+		return []string{"gpt-3.5-turbo", "gpt-4"}
+	}
+	defer resp.Body.Close()
+
+	var response struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return []string{"gpt-3.5-turbo", "gpt-4"}
+	}
+
+	models := make([]string, 0)
+	for _, model := range response.Data {
+		if strings.HasPrefix(model.ID, "gpt") {
+			models = append(models, model.ID)
+		}
+	}
+	return models
 }

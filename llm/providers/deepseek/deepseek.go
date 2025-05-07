@@ -28,7 +28,6 @@ type Provider struct {
 func New(options map[string]interface{}) (llm.Provider, error) {
 	p := &Provider{
 		Provider: base.Provider{
-			Models:    []string{"deepseek-chat", "deepseek-coder"},
 			Model:     "deepseek-chat",
 			Pname:     name,
 			MaxTokens: share.MAX_TOKENS,
@@ -48,9 +47,6 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 
 	if endpoint, ok := options["WN_DEEPSEEK_ENDPOINT"].(string); ok && endpoint != "" {
 		p.APIEndpoint = endpoint
-	}
-	if models, ok := options["WN_DEEPSEEK_MODELS"].([]string); ok && len(models) > 0 {
-		p.Models = models
 	}
 	if model, ok := options["WN_DEEPSEEK_MODEL"].(string); ok {
 		p.Model = model
@@ -385,6 +381,34 @@ func (p *Provider) ParseStreamResponse(data string) (content string, finishReaso
 	}
 
 	return choice.Delta.Content, choice.FinishReason, nil
+}
+
+// AvailableModels 通过API获取支持的模型列表
+func (p *Provider) AvailableModels() []string {
+	// 发送请求到 models 接口
+	resp, err := p.Client.Get("https://api.deepseek.com/v1/models")
+	if err != nil {
+		// 如果API调用失败，返回默认支持的模型
+		return []string{"deepseek-chat", "deepseek-coder"}
+	}
+	defer resp.Body.Close()
+
+	var response struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		// 如果解析失败，返回默认支持的模型
+		return []string{"deepseek-chat", "deepseek-coder"}
+	}
+
+	models := make([]string, 0, len(response.Data))
+	for _, model := range response.Data {
+		models = append(models, model.ID)
+	}
+	return models
 }
 
 func init() {

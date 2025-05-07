@@ -44,7 +44,6 @@ func (h *HTTPHandler) DoRequest(ctx context.Context, reqBody []byte) (*http.Resp
 // Provider 提供基础的 LLM Provider 实现
 type Provider struct {
 	HTTPHandler
-	Models    []string
 	Model     string
 	Pname     string
 	MaxTokens int
@@ -53,11 +52,6 @@ type Provider struct {
 // Name 返回提供商名称
 func (p *Provider) Name() string {
 	return p.Pname
-}
-
-// AvailableModels 返回支持的模型列表
-func (p *Provider) AvailableModels() []string {
-	return p.Models
 }
 
 // SetModel 设置当前使用的模型
