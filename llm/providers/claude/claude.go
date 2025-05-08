@@ -18,7 +18,9 @@ import (
 
 const (
 	name               = "claude"
-	defaultAPIEndpoint = "https://api.anthropic.com/v1/messages"
+	baseAPIEndpoint    = "https://api.anthropic.com/v1"
+	defaultAPIEndpoint = baseAPIEndpoint + "/messages"
+	modelsAPIEndpoint  = baseAPIEndpoint + "/models"
 )
 
 type Provider struct {
@@ -273,34 +275,50 @@ func init() {
 	llm.Register(name, New)
 }
 
-// AvailableModels 通过API获取支持的模型列表
 func (p *Provider) AvailableModels() []string {
-	endpoint := "https://api.anthropic.com/v1/models"
-	req, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		return []string{"claude-2", "claude-instant-1"}
-	}
-	req.Header.Set("x-api-key", p.APIKey)
+    req, err := http.NewRequestWithContext(context.Background(), "GET", modelsAPIEndpoint, nil)
+    if err != nil {
+        helper.PrintWithLabel("[ERROR] Failed to create models request", err)
+        return []string{}
+    }
+    
+    // 添加必要的请求头
+    req.Header.Set("anthropic-version", "2023-06-01")
+    req.Header.Set("Authorization", "Bearer "+p.APIKey)
+    
+    // 使用 base.HTTPHandler 的 DoRequest 方法
+    resp, err := p.DoRequest(context.Background(), nil)
+    if err != nil {
+        helper.PrintWithLabel("[ERROR] Failed to fetch models", err)
+        return []string{}
+    }
+    defer resp.Body.Close()
+    
+    if resp.StatusCode != http.StatusOK {
+        body, _ := io.ReadAll(resp.Body)
+        helper.PrintWithLabel("[ERROR] API returned non-200 status code", fmt.Sprintf("status: %d, body: %s", resp.StatusCode, string(body)))
+        return []string{}
+    }
+    
+    var response struct {
+        Models []struct {
+            Name string `json:"name"`
+        } `json:"models"`
+    }
 
-	resp, err := p.Client.Do(req)
-	if err != nil {
-		return []string{"claude-2", "claude-instant-1"}
-	}
-	defer resp.Body.Close()
+    if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+        helper.PrintWithLabel("[ERROR] Failed to decode models response", err)
+        return []string{}
+    }
 
-	var response struct {
-		Models []struct {
-			Name string `json:"name"`
-		} `json:"models"`
-	}
+    if len(response.Models) == 0 {
+        helper.PrintWithLabel("[WARN] No models returned from API", nil)
+        return []string{}
+    }
 
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return []string{"claude-2", "claude-instant-1"}
-	}
-
-	models := make([]string, len(response.Models))
-	for i, model := range response.Models {
-		models[i] = model.Name
-	}
-	return models
+    models := make([]string, len(response.Models))
+    for i, model := range response.Models {
+        models[i] = model.Name
+    }
+    return models
 }

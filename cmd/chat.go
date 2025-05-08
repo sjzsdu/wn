@@ -27,10 +27,9 @@ func init() {
 func runChat(cmd *cobra.Command, args []string) {
 	// 使用 GetMcpHost 获取 host
 	host := GetMcpHost()
-	if host == nil {
-		return
+	if host != nil {
+		defer host.Close()
 	}
-	defer host.Close()
 
 	tools := host.GetTools(context.Background(), mcp.ListToolsRequest{})
 	chatOption := GetChatOptions()
@@ -38,9 +37,6 @@ func runChat(cmd *cobra.Command, args []string) {
 	chat, _ := aigc.NewChat(*chatOption, host)
 	// 启动交互式会话
 	ctx := context.Background()
-	// res, _ := chat.Complete(ctx, "mkdocs.yml 这个文件中写了什么东西？")
-	// println(res)
-
 	chat.StartInteractiveSession(ctx, aigc.InteractiveOptions{
 		Renderer: helper.GetDefaultRenderer(),
 		Debug:    false,

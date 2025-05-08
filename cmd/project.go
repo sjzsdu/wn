@@ -55,7 +55,7 @@ func runproject(cmd *cobra.Command, args []string) {
 	// 创建聊天实例
 	chat, err := aigc.NewChat(aigc.ChatOptions{
 		ProviderName: "", // 使用默认 provider
-		MessageLimit: MaxRecentMessages,
+		MessageLimit: llmMessageLimit,
 		UseAgent:     "project",
 		Request: llm.CompletionRequest{
 			Model:          "", // 使用默认 model

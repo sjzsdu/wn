@@ -11,6 +11,7 @@ import (
 	_ "github.com/sjzsdu/wn/llm/providers/claude"
 	_ "github.com/sjzsdu/wn/llm/providers/deepseek"
 	_ "github.com/sjzsdu/wn/llm/providers/openai"
+	_ "github.com/sjzsdu/wn/llm/providers/qwen"
 )
 
 var (
