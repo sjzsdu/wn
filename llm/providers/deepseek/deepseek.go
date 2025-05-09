@@ -1,12 +1,9 @@
 package deepseek
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -17,33 +14,46 @@ import (
 )
 
 const (
-	name               = "deepseek"
-	defaultAPIEndpoint = "https://api.deepseek.com/v1/chat/completions"
+	name            = "deepseek"
+	baseAPIEndpoint = "https://api.deepseek.com/v1"
+	CompletionPath  = "/chat/completions"
+	modelsPath      = "/models"
 )
 
 type Provider struct {
 	base.Provider
+	StreamHandler StreamHandler
 }
 
 func New(options map[string]interface{}) (llm.Provider, error) {
-	p := &Provider{
-		Provider: base.Provider{
-			Model:     "deepseek-chat",
-			Pname:     name,
-			MaxTokens: share.MAX_TOKENS,
-			HTTPHandler: base.HTTPHandler{
-				APIEndpoint: defaultAPIEndpoint,
-				Client:      &http.Client{},
-			},
-		},
-	}
-
 	// 配置验证和设置
 	apiKey, ok := options["WN_DEEPSEEK_APIKEY"].(string)
 	if !ok || apiKey == "" {
 		return nil, fmt.Errorf("deepseek: WN_DEEPSEEK_APIKEY is required")
 	}
-	p.APIKey = apiKey
+
+	config := base.RequestConfig{
+		Headers: map[string]string{
+			"Content-Type":  "application/json",
+			"Authorization": "Bearer " + apiKey,
+		},
+		Timeout: 30,
+		RetryConfig: &base.RetryConfig{
+			MaxRetries:  3,
+			RetryDelay:  1,
+			RetryPolicy: base.RetryPolicyLinear,
+		},
+	}
+
+	p := &Provider{
+		Provider: *base.NewProvider(
+			name,
+			apiKey,
+			baseAPIEndpoint,
+			"deepseek-chat",
+			config,
+		),
+	}
 
 	if endpoint, ok := options["WN_DEEPSEEK_ENDPOINT"].(string); ok && endpoint != "" {
 		p.APIEndpoint = endpoint
@@ -56,187 +66,124 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 }
 
 // Complete 实现完整的请求处理
-func (p *Provider) prepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
-	reqBody := p.Provider.CommonRequest(req)
+func (p *Provider) PrepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
+	reqBody := p.Provider.PrepareRequest(req)
 	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*DeepseekRequest)
 	reqBodyStruct.Stream = stream
 
-	// if share.GetDebug() {
-	// 	helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
-	// }
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
+	}
 	return json.Marshal(reqBodyStruct)
 }
 
-func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
-	jsonBody, err := p.prepareRequest(req, false)
+func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	jsonBody, err := p.PrepareRequest(req, false)
 	if err != nil {
-		return llm.CompletionResponse{}, fmt.Errorf("marshal request: %w", err)
+		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := p.DoRequest(ctx, jsonBody)
+	resp, err := p.DoPost(ctx, CompletionPath, jsonBody)
 	if err != nil {
-		return llm.CompletionResponse{}, err
+		return nil, err
 	}
-	defer resp.Body.Close()
 
-	return p.ParseResponse(resp.Body)
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("请求失败，状态码：%d，响应：%s", resp.StatusCode(), resp.String())
+	}
+	bodyBytes := resp.Body()
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Raw Response", string(bodyBytes))
+	}
+	return p.ParseResponse(bodyBytes)
+}
+
+func (p *Provider) ParseResponse(bodyBytes []byte) (*llm.CompletionResponse, error) {
+
+	var deepseekResp DeepseekResponse
+	if err := json.Unmarshal(bodyBytes, &deepseekResp); err != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Unmarshal Error:", err)
+		}
+		return nil, fmt.Errorf("解析响应失败: %w, 原始响应: %s", err, string(bodyBytes))
+	}
+
+	if len(deepseekResp.Choices) == 0 {
+		return nil, fmt.Errorf("no choices in response")
+	}
+
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Deepseek Response:", deepseekResp)
+	}
+
+	choice := deepseekResp.Choices[0]
+	response := llm.CompletionResponse{
+		Content:      choice.Message.Content,
+		FinishReason: choice.FinishReason,
+		Usage: llm.Usage{
+			PromptTokens:     deepseekResp.Usage.PromptTokens,
+			CompletionTokens: deepseekResp.Usage.CompletionTokens,
+			TotalTokens:      deepseekResp.Usage.TotalTokens,
+		},
+	}
+
+	if choice.Message.ToolCalls != nil && len(choice.Message.ToolCalls) > 0 {
+		toolCalls := make([]llm.ToolCall, len(choice.Message.ToolCalls))
+		for i, tc := range choice.Message.ToolCalls {
+			toolCalls[i] = llm.ToolCall{
+				ID:        tc.ID,
+				Type:      tc.Type,
+				Function:  tc.Function.Name,
+				Arguments: helper.StringToMap(tc.Function.Arguments),
+			}
+		}
+		response.Content = ""
+		response.ToolCalls = toolCalls
+	}
+
+	return &response, nil
 }
 
 func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-	jsonBody, err := p.prepareRequest(req, true)
+	p.StreamHandler = NewStreamHandler(handler)
+	jsonBody, err := p.PrepareRequest(req, true)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := p.DoRequest(ctx, jsonBody)
+	resp, err := p.DoStream(ctx, CompletionPath, jsonBody)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	return p.handleStream(resp.Body, handler)
+	return p.HandleStreamResponse(resp, p)
+}
+
+func (p *Provider) HandleStream(bytes []byte) error {
+	line := strings.TrimSpace(string(bytes))
+	if line == "" || line == "data: [DONE]" || !strings.HasPrefix(line, "data: ") {
+		return nil
+	}
+	data := strings.TrimPrefix(line, "data: ")
+
+	p.StreamHandler.AddContent([]byte(data))
+	return nil
 }
 
 func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
 	request, _ := helper.MapToStruct[DeepseekRequest](reqBody)
-	request.Tools = p.handleTools(req.Tools)
+
 	request.Messages = p.handleMessages(req.Messages)
 	request.ResponseFormat = ResponseFormat{
 		Type: req.ResponseFormat,
 	}
 
-	// if share.GetDebug() {
-	// 	helper.PrintWithLabel("[DEBUG] Resolve Tools:", request.Tools)
-	// }
-
-	return request
-}
-
-// handleStream 处理流式响应
-func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error {
-	reader := bufio.NewReader(body)
-	var fullContent strings.Builder
-	var toolCalls []llm.ToolCall
-	var usage llm.Usage
-
-	// 用于处理工具调用的变量
-	var currentToolCall *llm.ToolCall
-	var argumentsBuilder strings.Builder
-
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				// 如果还有未处理完的工具调用，添加到结果中
-				if currentToolCall != nil {
-					currentToolCall.Arguments = helper.StringToMap(argumentsBuilder.String())
-					toolCalls = append(toolCalls, *currentToolCall)
-				}
-				// 流式响应结束时返回完整数据
-				handler(llm.StreamResponse{
-					Content:      fullContent.String(),
-					FinishReason: "done",
-					Done:         true,
-					Response: &llm.CompletionResponse{
-						Content:      fullContent.String(),
-						FinishReason: "done",
-						ToolCalls:    toolCalls,
-						Usage:        usage,
-					},
-				})
-				break
-			}
-			return fmt.Errorf("read response: %w", err)
-		}
-
-		line = strings.TrimSpace(line)
-
-		if line == "" || line == "data: [DONE]" {
-			continue
-		}
-
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-
-		data := strings.TrimPrefix(line, "data: ")
-		var streamResp StreamResponse
-		if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
-			return fmt.Errorf("unmarshal stream response: %w", err)
-		}
-
-		if len(streamResp.Choices) > 0 {
-			choice := streamResp.Choices[0]
-
-			// 处理内容
-			if choice.Delta.Content != "" {
-				fullContent.WriteString(choice.Delta.Content)
-				handler(llm.StreamResponse{
-					Content: choice.Delta.Content,
-					Done:    false,
-				})
-			}
-
-			// 处理工具调用
-			if len(choice.Delta.ToolCalls) > 0 {
-				for _, tc := range choice.Delta.ToolCalls {
-					if tc.ID != "" {
-						// 新的工具调用开始
-						if currentToolCall == nil || currentToolCall.ID != tc.ID {
-							if currentToolCall != nil {
-								// 完成前一个工具调用
-								currentToolCall.Arguments = helper.StringToMap(argumentsBuilder.String())
-								toolCalls = append(toolCalls, *currentToolCall)
-							}
-							// 创建新的工具调用
-							currentToolCall = &llm.ToolCall{
-								ID:       tc.ID,
-								Type:     tc.Type,
-								Function: tc.Function.Name,
-							}
-							argumentsBuilder.Reset()
-						}
-					}
-					// 累积参数字符串
-					if tc.Function.Arguments != "" {
-						argumentsBuilder.WriteString(tc.Function.Arguments)
-					}
-				}
-			}
-
-			// 处理结束原因
-			if choice.FinishReason != "" {
-				// 处理最后一个工具调用
-				if choice.FinishReason == "tool_calls" && currentToolCall != nil {
-					currentToolCall.Arguments = helper.StringToMap(argumentsBuilder.String())
-					toolCalls = append(toolCalls, *currentToolCall)
-				}
-
-				if streamResp.Usage.TotalTokens > 0 {
-					usage = llm.Usage{
-						PromptTokens:     streamResp.Usage.PromptTokens,
-						CompletionTokens: streamResp.Usage.CompletionTokens,
-						TotalTokens:      streamResp.Usage.TotalTokens,
-					}
-				}
-
-				handler(llm.StreamResponse{
-					Content:      fullContent.String(),
-					FinishReason: choice.FinishReason,
-					Done:         true,
-					Response: &llm.CompletionResponse{
-						Content:      fullContent.String(),
-						FinishReason: choice.FinishReason,
-						ToolCalls:    toolCalls,
-						Usage:        usage,
-					},
-				})
-				break
-			}
-		}
+	// Only process tools if they exist
+	if req.Tools != nil {
+		request.Tools = p.handleTools(req.Tools)
 	}
 
-	return nil
+	return request
 }
 
 func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
@@ -299,62 +246,6 @@ func (p *Provider) handleMessages(messages []llm.Message) []Message {
 	return result
 }
 
-func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error) {
-	bodyBytes, err := io.ReadAll(body)
-	if err != nil {
-		return llm.CompletionResponse{}, fmt.Errorf("read response body: %w", err)
-	}
-
-	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Raw Response:", string(bodyBytes))
-	}
-
-	var deepseekResp DeepseekResponse
-	if err := json.Unmarshal(bodyBytes, &deepseekResp); err != nil {
-		if share.GetDebug() {
-			helper.PrintWithLabel("[DEBUG] Raw Response Body:", string(bodyBytes))
-			helper.PrintWithLabel("[DEBUG] Unmarshal Error:", err)
-		}
-		return llm.CompletionResponse{}, fmt.Errorf("decode response: %w, raw response: %s", err, string(bodyBytes))
-	}
-
-	if len(deepseekResp.Choices) == 0 {
-		return llm.CompletionResponse{}, fmt.Errorf("no choices in response")
-	}
-
-	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Deepseek Response:", deepseekResp)
-	}
-
-	choice := deepseekResp.Choices[0]
-	resp := llm.CompletionResponse{
-		Content:      choice.Message.Content,
-		FinishReason: choice.FinishReason,
-		Usage: llm.Usage{
-			PromptTokens:     deepseekResp.Usage.PromptTokens,
-			CompletionTokens: deepseekResp.Usage.CompletionTokens,
-			TotalTokens:      deepseekResp.Usage.TotalTokens,
-		},
-	}
-
-	// 如果是工具调用，则处理工具调用的响应
-	if choice.Message.ToolCalls != nil && len(choice.Message.ToolCalls) > 0 {
-		toolCalls := make([]llm.ToolCall, len(choice.Message.ToolCalls))
-		for i, tc := range choice.Message.ToolCalls {
-			toolCalls[i] = llm.ToolCall{
-				ID:        tc.ID,
-				Type:      tc.Type,
-				Function:  tc.Function.Name,
-				Arguments: helper.StringToMap(tc.Function.Arguments),
-			}
-		}
-		resp.Content = ""
-		resp.ToolCalls = toolCalls
-	}
-
-	return resp, nil
-}
-
 func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {
 	var streamResp StreamResponse
 
@@ -385,13 +276,10 @@ func (p *Provider) ParseStreamResponse(data string) (content string, finishReaso
 
 // AvailableModels 通过API获取支持的模型列表
 func (p *Provider) AvailableModels() []string {
-	// 发送请求到 models 接口
-	resp, err := p.Client.Get("https://api.deepseek.com/v1/models")
+	resp, err := p.DoGet(context.Background(), modelsPath, nil)
 	if err != nil {
-		// 如果API调用失败，返回默认支持的模型
-		return []string{"deepseek-chat", "deepseek-coder"}
+		return []string{}
 	}
-	defer resp.Body.Close()
 
 	var response struct {
 		Data []struct {
@@ -399,9 +287,13 @@ func (p *Provider) AvailableModels() []string {
 		} `json:"data"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		// 如果解析失败，返回默认支持的模型
-		return []string{"deepseek-chat", "deepseek-coder"}
+	// 使用 Body() 而不是 RawBody()
+	if err := json.Unmarshal(resp.Body(), &response); err != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Models Response Error", err)
+			helper.PrintWithLabel("[DEBUG] Raw Response", string(resp.Body()))
+		}
+		return []string{}
 	}
 
 	models := make([]string, 0, len(response.Data))

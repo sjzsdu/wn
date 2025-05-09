@@ -1,69 +1,37 @@
 package base
 
 import (
-	"bytes"
-	"context"
-	"fmt"
-	"io"
-	"net/http"
-
 	"github.com/sjzsdu/wn/llm"
 )
 
-// HTTPHandler 处理基础的 HTTP 请求
-type HTTPHandler struct {
-	APIKey      string
-	APIEndpoint string
-	Client      *http.Client
+// NewProvider 创建新的Provider实例
+func NewProvider(name, apiKey, endpoint, model string, config RequestConfig) *Provider {
+	return &Provider{
+		HTTPHandler: NewHTTPHandler(apiKey, endpoint, config),
+		Model:       model,
+		Name:        name,
+		MaxTokens:   2048,
+	}
 }
 
-// DoRequest 执行 HTTP 请求
-func (h *HTTPHandler) DoRequest(ctx context.Context, reqBody []byte) (*http.Response, error) {
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", h.APIEndpoint, bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+h.APIKey)
-
-	resp, err := h.Client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("do request: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
-	}
-
-	return resp, nil
-}
-
-// Provider 提供基础的 LLM Provider 实现
-type Provider struct {
-	HTTPHandler
-	Model     string
-	Pname     string
-	MaxTokens int
-}
-
-// Name 返回提供商名称
-func (p *Provider) Name() string {
-	return p.Pname
+// GetName 返回提供商名称
+func (p *Provider) GetName() string {
+	return p.Name
 }
 
 // SetModel 设置当前使用的模型
 func (p *Provider) SetModel(model string) string {
-	if model == "" {
-		return p.Model
-	}
 	p.Model = model
 	return p.Model
 }
 
-func (p *Provider) CommonRequest(req llm.CompletionRequest) map[string]interface{} {
+// SetModel 设置当前使用的模型
+func (p *Provider) GetModel() string {
+	return p.Model
+}
+
+// PrepareRequest 准备通用请求参数
+func (p *Provider) PrepareRequest(req llm.CompletionRequest) map[string]interface{} {
 	if req.Model == "" {
 		req.Model = p.Model
 	}
@@ -72,10 +40,9 @@ func (p *Provider) CommonRequest(req llm.CompletionRequest) map[string]interface
 		req.MaxTokens = p.MaxTokens
 	}
 
-	reqBody := map[string]interface{}{
+	return map[string]interface{}{
 		"model":      req.Model,
 		"max_tokens": req.MaxTokens,
+		"messages":   req.Messages,
 	}
-
-	return reqBody
 }

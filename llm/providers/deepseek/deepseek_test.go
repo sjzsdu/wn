@@ -1,11 +1,13 @@
 package deepseek
 
 import (
-	"strings"
+	"context"
 	"testing"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sjzsdu/wn/llm"
+	"github.com/sjzsdu/wn/llm/providers/base"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -465,12 +467,41 @@ func TestHandleTools(t *testing.T) {
 	}
 }
 
+// 添加一个模拟的 HTTP 处理器
+type mockHTTPHandler struct {
+	Response []byte
+}
+
+func (h *mockHTTPHandler) DoPost(ctx context.Context, path string, body []byte) (*resty.Response, error) {
+	// 创建一个新的 resty 客户端
+	client := resty.New()
+
+	// 创建一个模拟的响应
+	resp := &resty.Response{
+		Request: client.R(),
+	}
+
+	// 设置响应内容
+	resp.SetBody(h.Response)
+	return resp, nil
+}
+
 func TestParseResponse(t *testing.T) {
-	p := &Provider{}
+	// 创建 Provider 实例
+	p := &Provider{
+		Provider: *base.NewProvider(
+			"deepseek",
+			"test-key",
+			"https://test.endpoint",
+			"deepseek-chat",
+			base.RequestConfig{},
+		),
+	}
+
 	tests := []struct {
 		name     string
 		response string
-		want     llm.CompletionResponse
+		want     *llm.CompletionResponse
 		wantErr  bool
 	}{
 		{
@@ -485,7 +516,7 @@ func TestParseResponse(t *testing.T) {
 						"index": 0,
 						"message": {
 							"role": "assistant",
-							"content": ""
+							"content": "测试响应"
 						},
 						"logprobs": null,
 						"finish_reason": "stop"
@@ -503,8 +534,8 @@ func TestParseResponse(t *testing.T) {
 				},
 				"system_fingerprint": "fp_8802369eaa_prod0425fp8"
 			}`,
-			want: llm.CompletionResponse{
-				Content:      "",
+			want: &llm.CompletionResponse{
+				Content:      "测试响应",
 				FinishReason: "stop",
 				Usage: llm.Usage{
 					PromptTokens:     1621,
@@ -514,12 +545,23 @@ func TestParseResponse(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:     "无效的 JSON",
+			response: "invalid json",
+			want:     nil,
+			wantErr:  true,
+		},
+		{
+			name:     "空的 choices",
+			response: `{"choices": []}`,
+			want:     nil,
+			wantErr:  true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader := strings.NewReader(tt.response)
-			got, err := p.ParseResponse(reader)
+			got, err := p.ParseResponse([]byte(tt.response))
 			if tt.wantErr {
 				assert.Error(t, err)
 				return

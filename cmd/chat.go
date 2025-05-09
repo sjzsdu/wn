@@ -37,6 +37,9 @@ func runChat(cmd *cobra.Command, args []string) {
 	chat, _ := aigc.NewChat(*chatOption, host)
 	// 启动交互式会话
 	ctx := context.Background()
+	// res, _ := chat.Complete(ctx, "解释一下mcp")
+	// println(res)
+
 	chat.StartInteractiveSession(ctx, aigc.InteractiveOptions{
 		Renderer: helper.GetDefaultRenderer(),
 		Debug:    false,

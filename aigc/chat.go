@@ -84,6 +84,7 @@ func (c *Chat) Complete(ctx context.Context, content string) (string, error) {
 		}
 		return "", compErr
 	}
+
 	if (resp.ToolCalls != nil) && (len(resp.ToolCalls) > 0) && c.host != nil {
 		msg := &llm.Message{
 			Role:      "assistant",
@@ -91,11 +92,27 @@ func (c *Chat) Complete(ctx context.Context, content string) (string, error) {
 			ToolCalls: resp.ToolCalls,
 		}
 		c.msgManager.Append(*msg)
+
+		// 检查上下文是否已经取消
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+
 		for _, toolCall := range resp.ToolCalls {
-			toolContent, _ := c.host.CallTool(ctx, wnmcp.NewToolCallRequest(toolCall.Function, toolCall.Arguments))
+			// 检查上下文是否已经取消
+			if ctx.Err() != nil {
+				return "", ctx.Err()
+			}
+
+			toolContent, err := c.host.CallTool(ctx, wnmcp.NewToolCallRequest(toolCall.Function, toolCall.Arguments))
+			if err != nil {
+				return "", fmt.Errorf("工具调用失败: %w", err)
+			}
+
 			if share.GetDebug() {
 				helper.PrintWithLabel("Tool call", toolCall, toolContent)
 			}
+
 			msg := &llm.Message{
 				Role:       "tool",
 				Content:    wnmcp.ToolCallResultToString(toolContent),
@@ -103,16 +120,16 @@ func (c *Chat) Complete(ctx context.Context, content string) (string, error) {
 			}
 			c.msgManager.Append(*msg)
 		}
+
+		// 使用相同的上下文继续递归调用
 		return c.Complete(ctx, "")
 	}
 	if c.options.Hooks.AfterResponse != nil {
-		if err := c.options.Hooks.AfterResponse(ctx, &req, &resp); err != nil {
+		if err := c.options.Hooks.AfterResponse(ctx, &req, resp); err != nil {
 			return "", err
 		}
 	}
-	if compErr != nil {
-		return "", compErr
-	}
+
 	c.msgManager.Append(llm.Message{
 		Role:    "assistant",
 		Content: resp.Content,

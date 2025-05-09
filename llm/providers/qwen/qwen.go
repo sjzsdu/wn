@@ -1,12 +1,9 @@
 package qwen
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -17,32 +14,46 @@ import (
 )
 
 const (
-	name               = "qwen"
-	defaultAPIEndpoint = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
+	name            = "qwen"
+	baseAPIEndpoint = "https://dashscope.aliyuncs.com/api/v1"
+	CompletionPath  = "/services/aigc/text-generation/generation"
+	modelsPath      = "/models"
 )
 
 type Provider struct {
 	base.Provider
+	StreamHandler StreamHandler
 }
 
 func New(options map[string]interface{}) (llm.Provider, error) {
-	p := &Provider{
-		Provider: base.Provider{
-			Model:     "qwen-turbo",
-			Pname:     name,
-			MaxTokens: share.MAX_TOKENS,
-			HTTPHandler: base.HTTPHandler{
-				APIEndpoint: defaultAPIEndpoint,
-				Client:      &http.Client{},
-			},
-		},
-	}
-
+	// 配置验证和设置
 	apiKey, ok := options["WN_QWEN_APIKEY"].(string)
 	if !ok || apiKey == "" {
 		return nil, fmt.Errorf("qwen: WN_QWEN_APIKEY is required")
 	}
-	p.APIKey = apiKey
+
+	config := base.RequestConfig{
+		Headers: map[string]string{
+			"Content-Type":  "application/json",
+			"Authorization": "Bearer " + apiKey,
+		},
+		Timeout: 30,
+		RetryConfig: &base.RetryConfig{
+			MaxRetries:  3,
+			RetryDelay:  1,
+			RetryPolicy: base.RetryPolicyLinear,
+		},
+	}
+
+	p := &Provider{
+		Provider: *base.NewProvider(
+			name,
+			apiKey,
+			baseAPIEndpoint,
+			"qwen-turbo",
+			config,
+		),
+	}
 
 	if endpoint, ok := options["WN_QWEN_ENDPOINT"].(string); ok && endpoint != "" {
 		p.APIEndpoint = endpoint
@@ -54,117 +65,58 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 	return p, nil
 }
 
-func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
-	reqBody := p.Provider.CommonRequest(req)
-	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
-	reqBodyStruct.Stream = false
+func (p *Provider) PrepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
+	reqBody := p.Provider.PrepareRequest(req)
+	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*QwenRequest)
+	// 修正：stream 参数应该在 Parameters 结构中设置
+	reqBodyStruct.Parameters.Stream = stream
+	reqBodyStruct.Model = p.Model // 添加模型信息
 
-	jsonBody, err := json.Marshal(reqBodyStruct)
-	if err != nil {
-		return llm.CompletionResponse{}, fmt.Errorf("marshal request: %w", err)
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
 	}
-
-	resp, err := p.DoRequest(ctx, jsonBody)
-	if err != nil {
-		return llm.CompletionResponse{}, err
-	}
-	defer resp.Body.Close()
-
-	return p.ParseResponse(resp.Body)
+	return json.Marshal(reqBodyStruct)
 }
 
-func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-	reqBody := p.Provider.CommonRequest(req)
-	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
-	reqBodyStruct.Stream = true
-
-	jsonBody, err := json.Marshal(reqBodyStruct)
+func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	jsonBody, err := p.PrepareRequest(req, false)
 	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
+		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := p.DoRequest(ctx, jsonBody)
+	resp, err := p.DoPost(ctx, CompletionPath, jsonBody)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer resp.Body.Close()
 
-	return p.handleStream(resp.Body, handler)
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("请求失败，状态码：%d，响应：%s", resp.StatusCode(), resp.String())
+	}
+	bodyBytes := resp.Body()
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Raw Response", string(bodyBytes))
+	}
+	return p.ParseResponse(bodyBytes)
 }
 
-func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error {
-	reader := bufio.NewReader(body)
-	var fullContent strings.Builder
-	var usage llm.Usage
-
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return fmt.Errorf("read response: %w", err)
+func (p *Provider) ParseResponse(bodyBytes []byte) (*llm.CompletionResponse, error) {
+	var qwenResp QwenResponse
+	if err := json.Unmarshal(bodyBytes, &qwenResp); err != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Unmarshal Error:", err)
 		}
-
-		line = strings.TrimSpace(line)
-		if line == "" || line == "data: [DONE]" {
-			continue
-		}
-
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-
-		data := strings.TrimPrefix(line, "data: ")
-		content, finishReason, err := p.ParseStreamResponse(data)
-		if err != nil {
-			return fmt.Errorf("parse stream response: %w", err)
-		}
-
-		if content != "" {
-			fullContent.WriteString(content)
-			handler(llm.StreamResponse{
-				Content: content,
-				Done:    false,
-			})
-		}
-
-		if finishReason != "" {
-			handler(llm.StreamResponse{
-				Content:      fullContent.String(),
-				FinishReason: finishReason,
-				Done:         true,
-				Response: &llm.CompletionResponse{
-					Content:      fullContent.String(),
-					FinishReason: finishReason,
-					Usage:        usage,
-				},
-			})
-			break
-		}
+		return nil, fmt.Errorf("解析响应失败: %w, 原始响应: %s", err, string(bodyBytes))
 	}
 
-	return nil
-}
-
-func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error) {
-	var qwenResp struct {
-		Output struct {
-			Text         string     `json:"text"`
-			ToolCalls    []ToolCall `json:"tool_calls"`
-			FinishReason string     `json:"finish_reason"`
-		} `json:"output"`
-		Usage struct {
-			InputTokens  int `json:"input_tokens"`
-			OutputTokens int `json:"output_tokens"`
-		} `json:"usage"`
+	if qwenResp.Output == nil {
+		return nil, fmt.Errorf("no output in response")
 	}
 
-	if err := json.NewDecoder(body).Decode(&qwenResp); err != nil {
-		return llm.CompletionResponse{}, fmt.Errorf("decode response: %w", err)
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Qwen Response:", qwenResp)
 	}
 
-	resp := llm.CompletionResponse{
+	response := llm.CompletionResponse{
 		Content:      qwenResp.Output.Text,
 		FinishReason: qwenResp.Output.FinishReason,
 		Usage: llm.Usage{
@@ -174,7 +126,7 @@ func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error)
 		},
 	}
 
-	if len(qwenResp.Output.ToolCalls) > 0 {
+	if qwenResp.Output.ToolCalls != nil && len(qwenResp.Output.ToolCalls) > 0 {
 		toolCalls := make([]llm.ToolCall, len(qwenResp.Output.ToolCalls))
 		for i, tc := range qwenResp.Output.ToolCalls {
 			toolCalls[i] = llm.ToolCall{
@@ -184,33 +136,61 @@ func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error)
 				Arguments: helper.StringToMap(tc.Function.Arguments),
 			}
 		}
-		resp.Content = ""
-		resp.ToolCalls = toolCalls
+		response.Content = ""
+		response.ToolCalls = toolCalls
 	}
 
-	return resp, nil
+	return &response, nil
 }
 
-func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {
-	var streamResp struct {
-		Output struct {
-			Text         string `json:"text"`
-			FinishReason string `json:"finish_reason"`
-		} `json:"output"`
-	}
+func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
+    p.StreamHandler = NewStreamHandler(handler)
+    jsonBody, err := p.PrepareRequest(req, true)
+    if err != nil {
+        return fmt.Errorf("准备请求失败: %w", err)
+    }
 
-	if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
-		return "", "", fmt.Errorf("unmarshal response: %w", err)
-	}
+    resp, err := p.DoPost(ctx, CompletionPath, jsonBody)
+    if err != nil {
+        return fmt.Errorf("发送请求失败: %w", err)
+    }
 
-	return streamResp.Output.Text, streamResp.Output.FinishReason, nil
+    if resp.StatusCode() != 200 {
+        return fmt.Errorf("请求失败，状态码：%d，响应：%s", resp.StatusCode(), resp.String())
+    }
+
+    return p.HandleJSONResponse(resp, p)
+}
+
+func (p *Provider) HandleStream(bytes []byte) error {
+	line := strings.TrimSpace(string(bytes))
+	if line == "" || line == "data: [DONE]" || !strings.HasPrefix(line, "data: ") {
+		return nil
+	}
+	data := strings.TrimPrefix(line, "data: ")
+
+	p.StreamHandler.AddContent([]byte(data))
+	return nil
 }
 
 func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
-	request, _ := helper.MapToStruct[CompletionRequestBody](reqBody)
-	request.Tools = p.handleTools(req.Tools)
-	request.Messages = p.handleMessages(req.Messages)
-	return request
+    request, _ := helper.MapToStruct[QwenRequest](reqBody)
+    
+    // 设置基本参数
+    request.Model = p.Model
+    request.Input.Messages = p.handleMessages(req.Messages)
+    
+    // 设置默认参数
+    if request.Parameters.MaxTokens == 0 {
+        request.Parameters.MaxTokens = req.MaxTokens
+    }
+    
+    // 处理工具调用
+    if req.Tools != nil {
+        request.Input.Tools = p.handleTools(req.Tools)
+    }
+
+    return request
 }
 
 func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
@@ -220,7 +200,7 @@ func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
 
 	result := make([]Tool, 0, len(tools))
 	for _, t := range tools {
-		tool := Tool{
+		qwenTool := Tool{
 			Type: "function",
 			Function: Function{
 				Name:        t.Name,
@@ -233,44 +213,41 @@ func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
 		}
 
 		if len(t.InputSchema.Required) > 0 {
-			tool.Function.Parameters["required"] = t.InputSchema.Required
+			qwenTool.Function.Parameters["required"] = t.InputSchema.Required
 		}
 
-		result = append(result, tool)
+		result = append(result, qwenTool)
 	}
 
 	return result
 }
 
 func (p *Provider) handleMessages(messages []llm.Message) []Message {
-	result := make([]Message, len(messages))
-	for i, m := range messages {
-		msg := Message{
-			Role:    m.Role,
-			Content: m.Content,
-		}
-
-		if m.ToolCallId != "" {
-			msg.ToolCallID = m.ToolCallId
-			msg.Name = m.Name
-		}
-
-		if len(m.ToolCalls) > 0 {
-			toolCalls := make([]ToolCall, len(m.ToolCalls))
-			for j, tc := range m.ToolCalls {
-				toolCalls[j] = ToolCall{
+	result := make([]Message, 0, len(messages))
+	for _, msg := range messages {
+		// 转换工具调用
+		var toolCalls []ToolCall
+		if msg.ToolCalls != nil {
+			toolCalls = make([]ToolCall, 0)
+			for _, tc := range msg.ToolCalls {
+				toolCalls = append(toolCalls, ToolCall{
 					ID:   tc.ID,
 					Type: tc.Type,
 					Function: CallFunction{
 						Name:      tc.Function,
 						Arguments: helper.ToJSONString(tc.Arguments),
 					},
-				}
+				})
 			}
-			msg.ToolCalls = toolCalls
 		}
 
-		result[i] = msg
+		result = append(result, Message{
+			Role:       msg.Role,
+			Content:    msg.Content,
+			Name:       msg.Name,
+			ToolCallId: msg.ToolCallId,
+			ToolCalls:  toolCalls,
+		})
 	}
 	return result
 }
@@ -281,18 +258,14 @@ func init() {
 
 // AvailableModels 通过API获取支持的模型列表
 func (p *Provider) AvailableModels() []string {
-	endpoint := "https://dashscope.aliyuncs.com/api/v1/models"
-	req, err := http.NewRequest("GET", endpoint, nil)
-	if err != nil {
-		return []string{"qwen-turbo", "qwen-plus", "qwen-max"}
-	}
-	req.Header.Set("Authorization", "Bearer "+p.APIKey)
-
-	resp, err := p.Client.Do(req)
-	if err != nil {
-		return []string{"qwen-turbo", "qwen-plus", "qwen-max"}
-	}
-	defer resp.Body.Close()
+    // 修正：使用正确的 API 路径
+    resp, err := p.DoGet(context.Background(), "/models", nil)
+    if err != nil {
+        if share.GetDebug() {
+            helper.PrintWithLabel("[DEBUG] Get Models Error:", err)
+        }
+        return []string{"qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-longcontext"}
+    }
 
 	var response struct {
 		Models []struct {
@@ -300,8 +273,13 @@ func (p *Provider) AvailableModels() []string {
 		} `json:"models"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return []string{"qwen-turbo", "qwen-plus", "qwen-max"}
+	if err := json.Unmarshal(resp.Body(), &response); err != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Models Response Error", err)
+			helper.PrintWithLabel("[DEBUG] Raw Response", string(resp.Body()))
+		}
+		// 解析失败时返回基础模型列表
+		return []string{"qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-longcontext"}
 	}
 
 	models := make([]string, 0)
@@ -310,5 +288,11 @@ func (p *Provider) AvailableModels() []string {
 			models = append(models, model.Name)
 		}
 	}
+
+	// 如果没有获取到任何模型，返回基础模型列表
+	if len(models) == 0 {
+		return []string{"qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-longcontext"}
+	}
+
 	return models
 }

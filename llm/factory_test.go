@@ -18,7 +18,7 @@ func (m *mockProvider) AvailableModels() []string {
 }
 
 // 添加Name方法以完整实现Provider接口
-func (m *mockProvider) Name() string {
+func (m *mockProvider) GetName() string {
 	return "mock"
 }
 
@@ -26,9 +26,13 @@ func (m *mockProvider) SetModel(model string) string {
 	return "mock-model"
 }
 
+func (m *mockProvider) GetModel() string {
+	return "mock-model"
+}
+
 // 修正Complete方法的签名以匹配Provider接口
-func (m *mockProvider) Complete(ctx context.Context, req CompletionRequest) (CompletionResponse, error) {
-	return CompletionResponse{
+func (m *mockProvider) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+	return &CompletionResponse{
 		Content: "mock completion",
 	}, nil
 }

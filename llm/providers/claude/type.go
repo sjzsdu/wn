@@ -37,3 +37,25 @@ type CallFunction struct {
 	Name      string `json:"name"`
 	Arguments string `json:"arguments"`
 }
+
+type StreamResponse struct {
+	ID           string    `json:"id"`
+	Type         string    `json:"type"`
+	Role         string    `json:"role"`
+	Content      []Content `json:"content"`
+	Model        string    `json:"model"`
+	StopReason   string    `json:"stop_reason,omitempty"`
+	StopSequence string    `json:"stop_sequence,omitempty"`
+	Usage        Usage     `json:"usage,omitempty"`
+}
+
+type Content struct {
+	Text      string     `json:"text"`
+	Type      string     `json:"type"`
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+}
+
+type Usage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+}

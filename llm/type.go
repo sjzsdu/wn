@@ -61,18 +61,19 @@ type StreamHandler func(StreamResponse)
 // Provider 接口定义
 type Provider interface {
 	// Complete 发送请求到大模型并获取回复
-	Complete(ctx context.Context, req CompletionRequest) (CompletionResponse, error)
+	Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error)
 
 	// CompleteStream 发送流式请求到大模型并通过回调处理响应
 	CompleteStream(ctx context.Context, req CompletionRequest, handler StreamHandler) error
 
 	// Name 返回提供商名称
-	Name() string
+	GetName() string
 
 	// AvailableModels 返回该提供商支持的模型列表
 	AvailableModels() []string
 
 	SetModel(model string) string
+	GetModel() string
 
 	// 使用泛型定义 HandleRequestBody 方法
 	HandleRequestBody(req CompletionRequest, reqBody map[string]interface{}) interface{}

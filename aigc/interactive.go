@@ -26,7 +26,7 @@ func (c *Chat) StartInteractiveSession(ctx context.Context, opts InteractiveOpti
 
 	fmt.Println(lang.T("Start chatting with AI") + " (" + lang.T("Enter 'quit' or 'q' to end the conversation") + ")")
 	fmt.Println(lang.T("Tips: Type 'vim' or press Ctrl+V to open vim for multi-line input"))
-	fmt.Println(lang.T("Using model")+":", c.provider.SetModel(""))
+	fmt.Println(lang.T("Using model")+":", c.provider.GetModel())
 
 	messages := c.GetMessages()
 	if len(messages) > 0 {

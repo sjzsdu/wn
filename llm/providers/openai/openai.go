@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -17,32 +16,45 @@ import (
 )
 
 const (
-	name               = "openai"
-	defaultAPIEndpoint = "https://api.openai.com/v1/chat/completions"
+	name            = "openai"
+	baseAPIEndpoint = "https://api.openai.com/v1"
+	CompletionPath  = "/chat/completions"
+	modelsPath      = "/models"
 )
 
 type Provider struct {
 	base.Provider
+	StreamHandler StreamHandler
 }
 
 func New(options map[string]interface{}) (llm.Provider, error) {
-	p := &Provider{
-		Provider: base.Provider{
-			Model:     "gpt-3.5-turbo",
-			Pname:     name,
-			MaxTokens: share.MAX_TOKENS,
-			HTTPHandler: base.HTTPHandler{
-				APIEndpoint: defaultAPIEndpoint,
-				Client:      &http.Client{},
-			},
-		},
-	}
-
 	apiKey, ok := options["WN_OPENAI_APIKEY"].(string)
 	if !ok || apiKey == "" {
 		return nil, fmt.Errorf("openai: WN_OPENAI_APIKEY is required")
 	}
-	p.APIKey = apiKey
+
+	config := base.RequestConfig{
+		Headers: map[string]string{
+			"Content-Type":  "application/json",
+			"Authorization": "Bearer " + apiKey,
+		},
+		Timeout: 30,
+		RetryConfig: &base.RetryConfig{
+			MaxRetries:  3,
+			RetryDelay:  1,
+			RetryPolicy: base.RetryPolicyLinear,
+		},
+	}
+
+	p := &Provider{
+		Provider: *base.NewProvider(
+			name,
+			apiKey,
+			baseAPIEndpoint,
+			"gpt-3.5-turbo",
+			config,
+		),
+	}
 
 	if endpoint, ok := options["WN_OPENAI_ENDPOINT"].(string); ok && endpoint != "" {
 		p.APIEndpoint = endpoint
@@ -55,43 +67,65 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 }
 
 // Complete 实现完整的请求处理
-func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (llm.CompletionResponse, error) {
-	reqBody := p.Provider.CommonRequest(req)
-	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
-	reqBodyStruct.Stream = false
-
-	jsonBody, err := json.Marshal(reqBodyStruct)
+func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	jsonBody, err := p.PrepareRequest(req, false)
 	if err != nil {
-		return llm.CompletionResponse{}, fmt.Errorf("marshal request: %w", err)
+		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := p.DoRequest(ctx, jsonBody)
+	resp, err := p.DoPost(ctx, CompletionPath, jsonBody)
 	if err != nil {
-		return llm.CompletionResponse{}, err
+		return nil, err
 	}
-	defer resp.Body.Close()
 
-	return p.ParseResponse(resp.Body)
+	if resp.StatusCode() != 200 {
+		return nil, fmt.Errorf("请求失败，状态码：%d，响应：%s", resp.StatusCode(), resp.String())
+	}
+
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Raw Response", resp.String())
+	}
+
+	return p.ParseResponse(resp.RawBody())
 }
 
 // CompleteStream 实现流式请求处理
 func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-	reqBody := p.Provider.CommonRequest(req)
-	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
-	reqBodyStruct.Stream = true
-
-	jsonBody, err := json.Marshal(reqBodyStruct)
+	p.StreamHandler = NewStreamHandler(handler)
+	jsonBody, err := p.PrepareRequest(req, true)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := p.DoRequest(ctx, jsonBody)
+	resp, err := p.DoPost(ctx, "", jsonBody)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	return p.handleStream(resp.Body, handler)
+	return p.HandleJSONResponse(resp, p)
+}
+
+// HandleStream 处理流式响应
+func (p *Provider) HandleStream(bytes []byte) error {
+	line := strings.TrimSpace(string(bytes))
+	if line == "" || line == "data: [DONE]" || !strings.HasPrefix(line, "data: ") {
+		return nil
+	}
+	data := strings.TrimPrefix(line, "data: ")
+
+	return p.StreamHandler.AddContent([]byte(data))
+}
+
+// PrepareRequest 准备请求
+func (p *Provider) PrepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
+	reqBody := p.Provider.PrepareRequest(req)
+	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
+	reqBodyStruct.Stream = stream
+
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
+	}
+	return json.Marshal(reqBodyStruct)
 }
 
 // handleStream 处理流式响应
@@ -223,7 +257,7 @@ func (p *Provider) handleStream(body io.Reader, handler llm.StreamHandler) error
 	return nil
 }
 
-func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error) {
+func (p *Provider) ParseResponse(body io.Reader) (*llm.CompletionResponse, error) {
 	var openAIResp struct {
 		Choices []struct {
 			Message struct {
@@ -239,12 +273,21 @@ func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error)
 		} `json:"usage"`
 	}
 
-	if err := json.NewDecoder(body).Decode(&openAIResp); err != nil {
-		return llm.CompletionResponse{}, fmt.Errorf("decode response: %w", err)
+	bodyBytes, err := io.ReadAll(body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应体失败: %w", err)
+	}
+
+	if err := json.Unmarshal(bodyBytes, &openAIResp); err != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Unmarshal Error:", err)
+			helper.PrintWithLabel("[DEBUG] Raw Response", string(bodyBytes))
+		}
+		return nil, fmt.Errorf("解析响应失败: %w, 原始响应: %s", err, string(bodyBytes))
 	}
 
 	if len(openAIResp.Choices) == 0 {
-		return llm.CompletionResponse{}, fmt.Errorf("no choices in response")
+		return nil, fmt.Errorf("no choices in response")
 	}
 
 	choice := openAIResp.Choices[0]
@@ -273,7 +316,7 @@ func (p *Provider) ParseResponse(body io.Reader) (llm.CompletionResponse, error)
 		resp.ToolCalls = toolCalls
 	}
 
-	return resp, nil
+	return &resp, nil
 }
 
 func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {
@@ -377,24 +420,15 @@ func (p *Provider) handleMessages(messages []llm.Message) []Message {
 	return result
 }
 
-func init() {
-	llm.Register(name, New)
-}
-
 // AvailableModels 通过API获取支持的模型列表
 func (p *Provider) AvailableModels() []string {
-	endpoint := "https://api.openai.com/v1/models"
-	req, err := http.NewRequest("GET", endpoint, nil)
+	resp, err := p.DoGet(context.Background(), "/models", nil)
 	if err != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Get Models Error:", err)
+		}
 		return []string{"gpt-3.5-turbo", "gpt-4"}
 	}
-	req.Header.Set("Authorization", "Bearer "+p.APIKey)
-
-	resp, err := p.Client.Do(req)
-	if err != nil {
-		return []string{"gpt-3.5-turbo", "gpt-4"}
-	}
-	defer resp.Body.Close()
 
 	var response struct {
 		Data []struct {
@@ -402,7 +436,12 @@ func (p *Provider) AvailableModels() []string {
 		} `json:"data"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	bodyBytes := resp.Body()
+	if err := json.Unmarshal(bodyBytes, &response); err != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Models Response Error", err)
+			helper.PrintWithLabel("[DEBUG] Raw Response", string(bodyBytes))
+		}
 		return []string{"gpt-3.5-turbo", "gpt-4"}
 	}
 
@@ -413,4 +452,8 @@ func (p *Provider) AvailableModels() []string {
 		}
 	}
 	return models
+}
+
+func init() {
+	llm.Register(name, New)
 }

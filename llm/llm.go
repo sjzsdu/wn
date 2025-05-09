@@ -60,9 +60,9 @@ func GetDefaultProvider() Provider {
 }
 
 // Complete 使用默认提供商发送请求
-func Complete(ctx context.Context, req CompletionRequest) (CompletionResponse, error) {
+func Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
 	if defaultProvider == nil {
-		return CompletionResponse{}, fmt.Errorf("no default provider set")
+		return nil, fmt.Errorf("no default provider set")
 	}
 	return defaultProvider.Complete(ctx, req)
 }

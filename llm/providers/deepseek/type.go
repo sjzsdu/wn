@@ -46,8 +46,8 @@ type CallFunction struct {
 }
 
 type ToolCall struct {
-	Index    int          `json:"index"` // 移除 omitempty，因为这是必需字段
-	ID       string       `json:"id"`    // 改为大写 ID
+	Index    int          `json:"index"`
+	ID       string       `json:"id"`
 	Type     string       `json:"type"`
 	Function CallFunction `json:"function"`
 }
