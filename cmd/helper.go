@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/sjzsdu/wn/aigc"
+	"github.com/sjzsdu/wn/config"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/project"
@@ -46,10 +47,19 @@ func GetMcpHost() *wnmcp.Host {
 func GetChatOptions() *aigc.ChatOptions {
 	// 设置默认值
 	if llmName == "" {
-		llmName = share.DEFAULT_LLM_NAME
+		// 优先从配置中获取默认提供商
+		llmName = config.GetConfig("default_provider")
+		if llmName == "" {
+			llmName = share.DEFAULT_LLM_NAME
+		}
 	}
 	if llmModel == "" {
-		llmModel = share.DEFAULT_LLM_MODEL
+		// 根据提供商获取对应的默认模型
+		modelKey := fmt.Sprintf("%s_model", llmName)
+		llmModel = config.GetConfig(modelKey)
+		if llmModel == "" {
+			llmModel = share.DEFAULT_LLM_MODEL
+		}
 	}
 	if llmAgent == "" {
 		llmAgent = share.DEFAULT_LLM_AGENT

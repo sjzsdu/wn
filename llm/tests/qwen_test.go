@@ -7,16 +7,16 @@ import (
 	"testing"
 
 	"github.com/sjzsdu/wn/llm"
-	"github.com/sjzsdu/wn/llm/providers/deepseek"
+	"github.com/sjzsdu/wn/llm/providers/qwen"
 	"github.com/stretchr/testify/assert"
 )
 
-func getDeepseekProvider() (llm.Provider, error) {
-	if os.Getenv("WN_DEEPSEEK_APIKEY") == "" {
-		return nil, fmt.Errorf("请设置 WN_DEEPSEEK_APIKEY 环境变量")
+func getQwenProvider() (llm.Provider, error) {
+	if os.Getenv("WN_QWEN_APIKEY") == "" {
+		return nil, fmt.Errorf("请设置 WN_QWEN_APIKEY 环境变量")
 	}
-	provider, err := deepseek.New(map[string]interface{}{
-		"WN_DEEPSEEK_APIKEY": os.Getenv("WN_DEEPSEEK_APIKEY"),
+	provider, err := qwen.New(map[string]interface{}{
+		"WN_QWEN_APIKEY": os.Getenv("WN_QWEN_APIKEY"),
 	})
 	if err != nil {
 		return nil, err
@@ -24,10 +24,10 @@ func getDeepseekProvider() (llm.Provider, error) {
 	return provider, nil
 }
 
-func TestDeepseekBasicChat(t *testing.T) {
-	provider, err := getDeepseekProvider()
+func TestQwenBasicChat(t *testing.T) {
+	provider, err := getQwenProvider()
 	if err != nil {
-		t.Skip("WN_DEEPSEEK_APIKEY not set, skipping test")
+		t.Skip("WN_QWEN_APIKEY not set, skipping test")
 		return
 	}
 	assert.NotNil(t, provider)
@@ -40,7 +40,7 @@ func TestDeepseekBasicChat(t *testing.T) {
 				Content: "你是什么模型？",
 			},
 		},
-		Model:          "deepseek-chat",
+		Model:          "qwen-turbo",
 		ResponseFormat: "text",
 	}
 
@@ -54,10 +54,10 @@ func TestDeepseekBasicChat(t *testing.T) {
 	}
 }
 
-func TestDeepseekStreamChat(t *testing.T) {
-	provider, err := getDeepseekProvider()
+func TestQwenStreamChat(t *testing.T) {
+	provider, err := getQwenProvider()
 	if err != nil {
-		t.Skip("WN_DEEPSEEK_APIKEY not set, skipping test")
+		t.Skip("WN_QWEN_APIKEY not set, skipping test")
 		return
 	}
 	assert.NotNil(t, provider)
@@ -70,7 +70,7 @@ func TestDeepseekStreamChat(t *testing.T) {
 				Content: "你是什么模型？",
 			},
 		},
-		Model:          "deepseek-chat",
+		Model:          "qwen-turbo",
 		ResponseFormat: "text",
 	}
 
@@ -92,23 +92,23 @@ func TestDeepseekStreamChat(t *testing.T) {
 	assert.NotEmpty(t, responses)
 }
 
-func TestDeepseekProviderName(t *testing.T) {
-	provider, err := getDeepseekProvider()
+func TestQwenProviderName(t *testing.T) {
+	provider, err := getQwenProvider()
 	if err != nil {
-		t.Skip("WN_DEEPSEEK_APIKEY not set, skipping test")
+		t.Skip("WN_QWEN_APIKEY not set, skipping test")
 		return
 	}
 	assert.NotNil(t, provider)
 
 	// 测试 GetName 方法
 	name := provider.GetName()
-	assert.Equal(t, "deepseek", name)
+	assert.Equal(t, "qwen", name)
 }
 
-func TestDeepseekAvailableModels(t *testing.T) {
-	provider, err := getDeepseekProvider()
+func TestQwenAvailableModels(t *testing.T) {
+	provider, err := getQwenProvider()
 	if err != nil {
-		t.Skip("WN_DEEPSEEK_APIKEY not set, skipping test")
+		t.Skip("WN_QWEN_APIKEY not set, skipping test")
 		return
 	}
 	assert.NotNil(t, provider)
@@ -119,16 +119,16 @@ func TestDeepseekAvailableModels(t *testing.T) {
 	t.Logf("支持的模型列表: %v", models)
 }
 
-func TestDeepseekModelSetGet(t *testing.T) {
-	provider, err := getDeepseekProvider()
+func TestQwenModelSetGet(t *testing.T) {
+	provider, err := getQwenProvider()
 	if err != nil {
-		t.Skip("WN_DEEPSEEK_APIKEY not set, skipping test")
+		t.Skip("WN_QWEN_APIKEY not set, skipping test")
 		return
 	}
 	assert.NotNil(t, provider)
 
 	// 测试 SetModel 和 GetModel 方法
-	testModel := "deepseek-chat"
+	testModel := "qwen-turbo"
 	setModel := provider.SetModel(testModel)
 	assert.Equal(t, testModel, setModel)
 

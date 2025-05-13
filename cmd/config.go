@@ -27,6 +27,8 @@ var (
 		"openai_model":     "Set Openai default model",
 		"claude_apikey":    "Set Claude API Key",
 		"claude_model":     "Set Claude default model",
+		"qwen_apikey":      "Set Qwen API Key",
+		"qwen_model":       "Set Qwen default model",
 	}
 	listFlag bool
 )

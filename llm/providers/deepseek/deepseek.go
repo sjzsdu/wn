@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
@@ -227,66 +226,6 @@ func (p *Provider) HandleStream(bytes []byte) error {
 
 	p.StreamHandler.AddContent([]byte(data))
 	return nil
-}
-
-func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
-	if len(tools) == 0 {
-		return nil
-	}
-
-	result := make([]Tool, 0, len(tools))
-	for _, t := range tools {
-		// 创建一个新的 deepseek Tool
-		dsTool := Tool{
-			Type: "function",
-			Function: Function{
-				Name:        t.Name,
-				Description: t.Description,
-				Parameters: map[string]interface{}{
-					"type":       "object",
-					"properties": t.InputSchema.Properties,
-				},
-			},
-		}
-
-		if len(t.InputSchema.Required) > 0 {
-			dsTool.Function.Parameters["required"] = t.InputSchema.Required
-		}
-
-		result = append(result, dsTool)
-	}
-
-	return result
-}
-
-func (p *Provider) handleMessages(messages []llm.Message) []Message {
-	result := make([]Message, 0, len(messages))
-	for _, msg := range messages {
-		// 转换工具调用
-		var toolCalls []ToolCall
-		if msg.ToolCalls != nil {
-			toolCalls = make([]ToolCall, 0)
-			for _, tc := range msg.ToolCalls {
-				toolCalls = append(toolCalls, ToolCall{
-					ID:   tc.ID,
-					Type: tc.Type,
-					Function: CallFunction{
-						Name:      tc.Function,
-						Arguments: helper.ToJSONString(tc.Arguments),
-					},
-				})
-			}
-		}
-
-		result = append(result, Message{
-			Role:       msg.Role,
-			Content:    msg.Content,
-			Name:       msg.Name,
-			ToolCallId: msg.ToolCallId,
-			ToolCalls:  toolCalls,
-		})
-	}
-	return result
 }
 
 func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/sjzsdu/wn/lang"
+	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/share"
 	"github.com/spf13/cobra"
 
@@ -74,4 +75,5 @@ func init() {
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		share.SetDebug(inDebug)
 	}
+	llm.Init()
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
@@ -66,16 +65,76 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 }
 
 func (p *Provider) PrepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
-	reqBody := p.Provider.PrepareRequest(req)
-	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*QwenRequest)
-	// 修正：stream 参数应该在 Parameters 结构中设置
-	reqBodyStruct.Parameters.Stream = stream
-	reqBodyStruct.Model = p.Model // 添加模型信息
+	// 直接构建 QwenRequest
+	request := &QwenRequest{
+		Model: p.Model,
+		Input: Input{
+			Messages: make([]Message, len(req.Messages)),
+		},
+		Parameters: Parameters{
+			MaxTokens: req.MaxTokens,
+			Stream:    stream,
+		},
+	}
+
+	// 转换消息
+	for i, msg := range req.Messages {
+		message := Message{
+			Role:       msg.Role,
+			Content:    msg.Content,
+			Name:       msg.Name,
+			ToolCallId: msg.ToolCallId,
+		}
+
+		// 处理工具调用
+		if msg.ToolCalls != nil {
+			toolCalls := make([]ToolCall, len(msg.ToolCalls))
+			for j, tc := range msg.ToolCalls {
+				toolCalls[j] = ToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: CallFunction{
+						Name:      tc.Function,
+						Arguments: helper.ToJSONString(tc.Arguments),
+					},
+				}
+			}
+			message.ToolCalls = toolCalls
+		}
+
+		request.Input.Messages[i] = message
+	}
+
+	// 处理工具
+	if req.Tools != nil {
+		tools := make([]Tool, 0, len(req.Tools))
+		for _, t := range req.Tools {
+			tool := Tool{
+				Type: "function",
+				Function: Function{
+					Name:        t.Name,
+					Description: t.Description,
+					Parameters: map[string]interface{}{
+						"type":       "object",
+						"properties": t.InputSchema.Properties,
+					},
+				},
+			}
+
+			if len(t.InputSchema.Required) > 0 {
+				tool.Function.Parameters["required"] = t.InputSchema.Required
+			}
+
+			tools = append(tools, tool)
+		}
+		request.Input.Tools = tools
+	}
 
 	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
+		helper.PrintWithLabel("[DEBUG] Request Body", request)
 	}
-	return json.Marshal(reqBodyStruct)
+
+	return json.Marshal(request)
 }
 
 func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
@@ -144,155 +203,76 @@ func (p *Provider) ParseResponse(bodyBytes []byte) (*llm.CompletionResponse, err
 }
 
 func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
-    p.StreamHandler = NewStreamHandler(handler)
-    jsonBody, err := p.PrepareRequest(req, true)
-    if err != nil {
-        return fmt.Errorf("准备请求失败: %w", err)
-    }
+	p.StreamHandler = NewStreamHandler(handler)
+	jsonBody, err := p.PrepareRequest(req, true)
+	if err != nil {
+		return fmt.Errorf("准备请求失败: %w", err)
+	}
 
-    resp, err := p.DoPost(ctx, CompletionPath, jsonBody)
-    if err != nil {
-        return fmt.Errorf("发送请求失败: %w", err)
-    }
+	resp, err := p.DoStream(ctx, CompletionPath, jsonBody)
+	if err != nil {
+		return fmt.Errorf("发送请求失败: %w", err)
+	}
 
-    if resp.StatusCode() != 200 {
-        return fmt.Errorf("请求失败，状态码：%d，响应：%s", resp.StatusCode(), resp.String())
-    }
+	if resp.StatusCode() != 200 {
+		return fmt.Errorf("请求失败，状态码：%d，响应：%s", resp.StatusCode(), resp.String())
+	}
 
-    return p.HandleJSONResponse(resp, p)
+	return p.HandleStreamResponse(resp, p)
 }
 
 func (p *Provider) HandleStream(bytes []byte) error {
 	line := strings.TrimSpace(string(bytes))
-	if line == "" || line == "data: [DONE]" || !strings.HasPrefix(line, "data: ") {
+	if line == "" || line == "data: [DONE]" || !strings.HasPrefix(line, "data:") {
 		return nil
 	}
 	data := strings.TrimPrefix(line, "data: ")
-
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Stream Response", string(data))
+	}
 	p.StreamHandler.AddContent([]byte(data))
 	return nil
 }
 
-func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
-    request, _ := helper.MapToStruct[QwenRequest](reqBody)
-    
-    // 设置基本参数
-    request.Model = p.Model
-    request.Input.Messages = p.handleMessages(req.Messages)
-    
-    // 设置默认参数
-    if request.Parameters.MaxTokens == 0 {
-        request.Parameters.MaxTokens = req.MaxTokens
-    }
-    
-    // 处理工具调用
-    if req.Tools != nil {
-        request.Input.Tools = p.handleTools(req.Tools)
-    }
-
-    return request
-}
-
-func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
-	if len(tools) == 0 {
-		return nil
-	}
-
-	result := make([]Tool, 0, len(tools))
-	for _, t := range tools {
-		qwenTool := Tool{
-			Type: "function",
-			Function: Function{
-				Name:        t.Name,
-				Description: t.Description,
-				Parameters: map[string]interface{}{
-					"type":       "object",
-					"properties": t.InputSchema.Properties,
-				},
-			},
-		}
-
-		if len(t.InputSchema.Required) > 0 {
-			qwenTool.Function.Parameters["required"] = t.InputSchema.Required
-		}
-
-		result = append(result, qwenTool)
-	}
-
-	return result
-}
-
-func (p *Provider) handleMessages(messages []llm.Message) []Message {
-	result := make([]Message, 0, len(messages))
-	for _, msg := range messages {
-		// 转换工具调用
-		var toolCalls []ToolCall
-		if msg.ToolCalls != nil {
-			toolCalls = make([]ToolCall, 0)
-			for _, tc := range msg.ToolCalls {
-				toolCalls = append(toolCalls, ToolCall{
-					ID:   tc.ID,
-					Type: tc.Type,
-					Function: CallFunction{
-						Name:      tc.Function,
-						Arguments: helper.ToJSONString(tc.Arguments),
-					},
-				})
-			}
-		}
-
-		result = append(result, Message{
-			Role:       msg.Role,
-			Content:    msg.Content,
-			Name:       msg.Name,
-			ToolCallId: msg.ToolCallId,
-			ToolCalls:  toolCalls,
-		})
-	}
-	return result
-}
-
-func init() {
-	llm.Register(name, New)
-}
-
 // AvailableModels 通过API获取支持的模型列表
 func (p *Provider) AvailableModels() []string {
-    // 修正：使用正确的 API 路径
-    resp, err := p.DoGet(context.Background(), "/models", nil)
-    if err != nil {
-        if share.GetDebug() {
-            helper.PrintWithLabel("[DEBUG] Get Models Error:", err)
-        }
-        return []string{"qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-longcontext"}
-    }
-
-	var response struct {
-		Models []struct {
-			Name string `json:"name"`
-		} `json:"models"`
+	// 修正：使用正确的 API 路径
+	resp, err := p.DoGet(context.Background(), "/models", nil)
+	if err != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Get Models Error:", err)
+		}
+		return []string{}
 	}
+
+	// 打印原始响应内容
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Raw Models Response", string(resp.Body()))
+	}
+
+	var response QwenModelsResponse
 
 	if err := json.Unmarshal(resp.Body(), &response); err != nil {
 		if share.GetDebug() {
 			helper.PrintWithLabel("[DEBUG] Models Response Error", err)
 			helper.PrintWithLabel("[DEBUG] Raw Response", string(resp.Body()))
 		}
-		// 解析失败时返回基础模型列表
-		return []string{"qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-longcontext"}
+		return []string{}
 	}
 
 	models := make([]string, 0)
-	for _, model := range response.Models {
-		if strings.HasPrefix(model.Name, "qwen") {
-			models = append(models, model.Name)
-		}
+	for _, model := range response.Output.Models {
+		models = append(models, model.Name)
 	}
 
 	// 如果没有获取到任何模型，返回基础模型列表
 	if len(models) == 0 {
-		return []string{"qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-longcontext"}
+		return []string{}
 	}
 
 	return models
+}
+
+func init() {
+	llm.Register(name, New)
 }

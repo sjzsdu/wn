@@ -1,8 +1,8 @@
 package qwen
 
 type QwenRequest struct {
-	Model   string        `json:"model"`
-	Input   Input        `json:"input"`
+	Model      string     `json:"model"`
+	Input      Input      `json:"input"`
 	Parameters Parameters `json:"parameters,omitempty"`
 }
 
@@ -12,14 +12,14 @@ type Input struct {
 }
 
 type Parameters struct {
-	Stream           bool    `json:"stream,omitempty"`
-	Temperature      float64 `json:"temperature,omitempty"`
-	TopP             float64 `json:"top_p,omitempty"`
-	TopK             int     `json:"top_k,omitempty"`
-	MaxTokens        int     `json:"max_tokens,omitempty"`
-	Stop             []string `json:"stop,omitempty"`
-	ResultFormat     string   `json:"result_format,omitempty"`
-	IncrementalOutput bool    `json:"incremental_output,omitempty"`
+	Stream            bool     `json:"stream,omitempty"`
+	Temperature       float64  `json:"temperature,omitempty"`
+	TopP              float64  `json:"top_p,omitempty"`
+	TopK              int      `json:"top_k,omitempty"`
+	MaxTokens         int      `json:"max_tokens,omitempty"`
+	Stop              []string `json:"stop,omitempty"`
+	ResultFormat      string   `json:"result_format,omitempty"`
+	IncrementalOutput bool     `json:"incremental_output,omitempty"`
 }
 
 type Message struct {
@@ -66,4 +66,20 @@ type Output struct {
 type Usage struct {
 	InputTokens  int `json:"input_tokens"`
 	OutputTokens int `json:"output_tokens"`
+}
+
+type QwenModelsResponse struct {
+	Output struct {
+		Total  int `json:"total"`
+		Models []struct {
+			Name         string `json:"name"`
+			Organization string `json:"organization"`
+			Description  string `json:"description"`
+			CreateTime   string `json:"create_time"`
+			UpdateTime   string `json:"update_time"`
+		} `json:"models"`
+		PageNo   int `json:"page_no"`
+		PageSize int `json:"page_size"`
+	} `json:"output"`
+	RequestId string `json:"request_id"`
 }
