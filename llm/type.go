@@ -74,7 +74,4 @@ type Provider interface {
 
 	SetModel(model string) string
 	GetModel() string
-
-	// 使用泛型定义 HandleRequestBody 方法
-	HandleRequestBody(req CompletionRequest, reqBody map[string]interface{}) interface{}
 }

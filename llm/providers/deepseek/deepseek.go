@@ -65,16 +65,75 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 	return p, nil
 }
 
-// Complete 实现完整的请求处理
+// PrepareRequest 将通用的 CompletionRequest 转换为 DeepseekRequest
 func (p *Provider) PrepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
-	reqBody := p.Provider.PrepareRequest(req)
-	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*DeepseekRequest)
-	reqBodyStruct.Stream = stream
+	// 创建 DeepseekRequest
+	request := &DeepseekRequest{
+		Messages: make([]Message, len(req.Messages)),
+		Model:    p.GetModel(),
+		Stream:   stream,
+	}
+
+	// 复制基本字段
+	request.MaxTokens = req.MaxTokens
+
+	// 转换消息
+	for i, msg := range req.Messages {
+		request.Messages[i] = Message{
+			Role:       msg.Role,
+			Content:    msg.Content,
+			Name:       msg.Name,
+			ToolCallId: msg.ToolCallId,
+		}
+
+		// 如果有工具调用，也需要转换
+		if msg.ToolCalls != nil {
+			toolCalls := make([]ToolCall, len(msg.ToolCalls))
+			for j, tc := range msg.ToolCalls {
+				toolCalls[j] = ToolCall{
+					ID:   tc.ID,
+					Type: tc.Type,
+					Function: CallFunction{
+						Name:      tc.Function,
+						Arguments: helper.ToJSONString(tc.Arguments),
+					},
+				}
+			}
+			request.Messages[i].ToolCalls = toolCalls
+		}
+	}
+
+	// 设置响应格式
+	if req.ResponseFormat != "" {
+		request.ResponseFormat = ResponseFormat{
+			Type: req.ResponseFormat,
+		}
+	}
+
+	// 处理工具
+	if req.Tools != nil {
+		tools := make([]Tool, len(req.Tools))
+		for i, t := range req.Tools {
+			tools[i] = Tool{
+				Type: "function",
+				Function: Function{
+					Name:        t.Name,
+					Description: t.Description,
+					Parameters: map[string]interface{}{
+						"type":       "object",
+						"properties": t.InputSchema.Properties,
+					},
+				},
+			}
+		}
+		request.Tools = tools
+	}
 
 	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Request Body", reqBodyStruct)
+		helper.PrintWithLabel("[DEBUG] Request Body", request)
 	}
-	return json.Marshal(reqBodyStruct)
+
+	return json.Marshal(request)
 }
 
 func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
@@ -168,22 +227,6 @@ func (p *Provider) HandleStream(bytes []byte) error {
 
 	p.StreamHandler.AddContent([]byte(data))
 	return nil
-}
-
-func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
-	request, _ := helper.MapToStruct[DeepseekRequest](reqBody)
-
-	request.Messages = p.handleMessages(req.Messages)
-	request.ResponseFormat = ResponseFormat{
-		Type: req.ResponseFormat,
-	}
-
-	// Only process tools if they exist
-	if req.Tools != nil {
-		request.Tools = p.handleTools(req.Tools)
-	}
-
-	return request
 }
 
 func (p *Provider) handleTools(tools []mcp.Tool) []Tool {

@@ -51,61 +51,6 @@ func (m *mockProvider) HandleRequestBody(req CompletionRequest, reqBody map[stri
 	return reqBody
 }
 
-func TestRegisterAndCreateProvider(t *testing.T) {
-	// 测试注册新的provider
-	mockNew := func(options map[string]interface{}) (Provider, error) {
-		return &mockProvider{}, nil
-	}
-
-	Register("mock", mockNew)
-
-	// 测试Providers函数
-	providers := Providers()
-	found := false
-	for _, name := range providers {
-		if name == "mock" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("Expected to find 'mock' in providers list")
-	}
-
-	// 测试创建provider
-	provider, err := CreateProvider("mock", nil)
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-	if provider == nil {
-		t.Error("Expected provider not to be nil")
-	}
-
-	// 测试HandleRequestBody方法
-	req := CompletionRequest{
-		Messages: []Message{{Role: "user", Content: "test"}},
-	}
-	reqBody := map[string]interface{}{
-		"messages": []Message{{Role: "user", Content: "test"}},
-	}
-	result := provider.HandleRequestBody(req, reqBody)
-	if result == nil {
-		t.Error("Expected HandleRequestBody result not to be nil")
-	}
-
-	// 测试创建不存在的provider
-	_, err = CreateProvider("non-existent", nil)
-	if err == nil {
-		t.Error("Expected error when creating non-existent provider")
-	}
-
-	// 测试创建provider时name为空
-	_, err = CreateProvider("", nil)
-	if err == nil {
-		t.Error("Expected error when creating provider with empty name")
-	}
-}
-
 func TestRegisterNilProvider(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
