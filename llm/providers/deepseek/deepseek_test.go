@@ -45,52 +45,6 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestParseStreamResponse(t *testing.T) {
-	p := &Provider{}
-	tests := []struct {
-		name        string
-		input       string
-		wantContent string
-		wantFinish  string
-		wantErr     bool
-	}{
-		{
-			name:        "正常响应",
-			input:       `{"choices":[{"delta":{"content":"Hello"},"finish_reason":null}]}`,
-			wantContent: "Hello",
-			wantFinish:  "",
-			wantErr:     false,
-		},
-		{
-			name:        "完成响应",
-			input:       `{"choices":[{"delta":{"content":""},"finish_reason":"stop"}]}`,
-			wantContent: "",
-			wantFinish:  "stop",
-			wantErr:     false,
-		},
-		{
-			name:        "无效 JSON",
-			input:       `invalid json`,
-			wantContent: "",
-			wantFinish:  "",
-			wantErr:     true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			content, finish, err := p.ParseStreamResponse(tt.input)
-			if tt.wantErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantContent, content)
-			assert.Equal(t, tt.wantFinish, finish)
-		})
-	}
-}
-
 // 添加一个模拟的 HTTP 处理器
 type mockHTTPHandler struct {
 	Response []byte

@@ -25,8 +25,16 @@ const htmlTemplate = `
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Blog Preview</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.2.0/github-markdown.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it-emoji/dist/markdown-it-emoji.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it-footnote/dist/markdown-it-footnote.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it-task-lists/dist/markdown-it-task-lists.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it-anchor/dist/markdown-it-anchor.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it-toc-done-right/dist/markdown-it-toc-done-right.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it-texmath/texmath.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
     <style>
         body {
             box-sizing: border-box;
@@ -53,11 +61,50 @@ const htmlTemplate = `
 <body>
     <div class="markdown-body" id="content"></div>
     <script>
+        // 初始化 markdown-it
+        const md = window.markdownit({
+            html: true,
+            linkify: true,
+            typographer: true,
+            breaks: true,
+            highlight: function (str, lang) {
+                if (lang && lang === 'mermaid') {
+                    return '<div class="mermaid">' + str + '</div>';
+                }
+                return '';
+            }
+        });
+
+        // 确保插件已经加载后再使用
+        if (window.markdownitEmoji) {
+            md.use(window.markdownitEmoji);
+        }
+        if (window.markdownitFootnote) {
+            md.use(window.markdownitFootnote);
+        }
+        if (window.markdownitTaskLists) {
+            md.use(window.markdownitTaskLists);
+        }
+        if (window.markdownitAnchor) {
+            md.use(window.markdownitAnchor);
+        }
+        if (window.markdownitTocDoneRight) {
+            md.use(window.markdownitTocDoneRight);
+        }
+        if (window.texmath && window.katex) {
+            md.use(window.texmath, { engine: window.katex });
+        }
+
         // 初始化 Mermaid
         mermaid.initialize({
             startOnLoad: true,
             theme: 'default',
-            securityLevel: 'loose'
+            securityLevel: 'loose',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
         });
 
         // 渲染内容
@@ -65,19 +112,10 @@ const htmlTemplate = `
             const contentDiv = document.getElementById('content');
             
             // 渲染 Markdown
-            contentDiv.innerHTML = marked.parse(markdown);
+            contentDiv.innerHTML = md.render(markdown);
             
-            // 处理 Mermaid 图表
-            contentDiv.querySelectorAll('code.language-mermaid').forEach(code => {
-                const pre = code.parentElement;
-                const div = document.createElement('div');
-                div.className = 'mermaid';
-                div.textContent = code.textContent;
-                pre.parentElement.replaceChild(div, pre);
-            });
-
             // 重新初始化 Mermaid
-            mermaid.init();
+            mermaid.init(undefined, document.querySelectorAll('.mermaid'));
         }
 
         let lastEtag = '';

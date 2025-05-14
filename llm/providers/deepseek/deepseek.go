@@ -36,7 +36,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 			"Content-Type":  "application/json",
 			"Authorization": "Bearer " + apiKey,
 		},
-		Timeout: 30,
+		Timeout: 10 * 60,
 		RetryConfig: &base.RetryConfig{
 			MaxRetries:  3,
 			RetryDelay:  1,
@@ -219,41 +219,13 @@ func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest
 
 func (p *Provider) HandleStream(bytes []byte) error {
 	line := strings.TrimSpace(string(bytes))
-	if line == "" || line == "data: [DONE]" || !strings.HasPrefix(line, "data: ") {
+	if line == "" || line == "data: [DONE]" || !strings.HasPrefix(line, "data:") {
 		return nil
 	}
 	data := strings.TrimPrefix(line, "data: ")
 
 	p.StreamHandler.AddContent([]byte(data))
 	return nil
-}
-
-func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {
-	var streamResp StreamResponse
-
-	if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
-		return "", "", fmt.Errorf("unmarshal response: %w", err)
-	}
-
-	if share.GetDebug() {
-		helper.PrintWithLabel("[DEBUG] Stream Response", streamResp)
-	}
-
-	if len(streamResp.Choices) == 0 {
-		return "", "", fmt.Errorf("empty choices in response")
-	}
-
-	choice := streamResp.Choices[0]
-
-	// 处理工具调用
-	if choice.FinishReason == "tool_calls" && len(choice.Delta.ToolCalls) > 0 {
-		if share.GetDebug() {
-			helper.PrintWithLabel("[DEBUG] Tool Calls", choice.Delta.ToolCalls)
-		}
-		return "", choice.FinishReason, nil
-	}
-
-	return choice.Delta.Content, choice.FinishReason, nil
 }
 
 // AvailableModels 通过API获取支持的模型列表

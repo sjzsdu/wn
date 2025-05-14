@@ -43,13 +43,22 @@ func parseUpdateOperations(resp string) ([]helper.UpdateOperation, error) {
 		}
 	}
 
+	// 尝试解析为数组
 	var changes []helper.UpdateOperation
 	err := json.Unmarshal([]byte(resp), &changes)
+	if err == nil {
+		return changes, nil
+	}
+
+	// 如果解析数组失败，尝试解析单个对象
+	var singleChange helper.UpdateOperation
+	err = json.Unmarshal([]byte(resp), &singleChange)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse response: %v", err)
 	}
 
-	return changes, nil
+	// 将单个对象转换为数组返回
+	return []helper.UpdateOperation{singleChange}, nil
 }
 
 func runBlog(cmd *cobra.Command, args []string) {
@@ -106,6 +115,9 @@ func runBlog(cmd *cobra.Command, args []string) {
 
 				return messages
 			},
+		},
+		Request: llm.CompletionRequest{
+			ResponseFormat: "json_object",
 		},
 	}, nil)
 	if err != nil {

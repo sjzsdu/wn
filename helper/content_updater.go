@@ -12,6 +12,15 @@ type UpdateOperation struct {
 // ApplyChanges 利用更新数组完成对原来文档的更新
 func ApplyChanges(blogContent string, changes []UpdateOperation) string {
 	for _, change := range changes {
+		// 统一处理空 Target 的情况
+		if change.Target == "" {
+			if blogContent != "" && !strings.HasSuffix(blogContent, "\n") {
+				blogContent += "\n"
+			}
+			blogContent += change.Content
+			continue
+		}
+
 		switch change.Operation {
 		case "insert":
 			blogContent = strings.Replace(blogContent, change.Target, change.Target+"\n"+change.Content, 1)

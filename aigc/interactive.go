@@ -113,6 +113,7 @@ func (c *Chat) processInteraction(ctx context.Context, input string, opts Intera
 			if !resp.Done {
 				fullContent.WriteString(resp.Content)
 				if err := opts.Renderer.WriteStream(resp.Content); err != nil {
+					helper.PrintWithLabel("Error writing stream", err)
 					fmt.Print(resp.Content)
 				}
 			} else {
