@@ -1,7 +1,6 @@
 package claude
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,13 +11,14 @@ import (
 	"github.com/sjzsdu/wn/helper"
 	"github.com/sjzsdu/wn/llm"
 	"github.com/sjzsdu/wn/llm/providers/base"
+	"github.com/sjzsdu/wn/share"
 )
 
 const (
 	name               = "claude"
 	baseAPIEndpoint    = "https://api.anthropic.com/v1"
-	defaultAPIEndpoint = baseAPIEndpoint + "/messages"
-	modelsAPIEndpoint  = baseAPIEndpoint + "/models"
+	defaultAPIEndpoint = "/messages"
+	modelsAPIEndpoint  = "/models"
 )
 
 type Provider struct {
@@ -36,7 +36,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 		Headers: map[string]string{
 			"Content-Type":      "application/json",
 			"Authorization":     "Bearer " + apiKey,
-			"anthropic-version": "2023-06-01", // Claude 特有的请求头
+			"anthropic-version": "2023-06-01",
 		},
 		Timeout: 30,
 		RetryConfig: &base.RetryConfig{
@@ -50,7 +50,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 		Provider: *base.NewProvider(
 			name,
 			apiKey,
-			defaultAPIEndpoint,
+			baseAPIEndpoint,
 			"claude-2",
 			config,
 		),
@@ -66,17 +66,38 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 	return p, nil
 }
 
-func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
-	reqBody := p.PrepareRequest(req)
-	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
-	reqBodyStruct.Stream = false
+func (p *Provider) PrepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
+	// 创建请求体结构
+	request := &CompletionRequestBody{
+		Model:    p.Model,
+		Stream:   stream,
+		Messages: p.handleMessages(req.Messages),
+	}
 
-	jsonBody, err := json.Marshal(reqBodyStruct)
+	// 处理工具
+	if req.Tools != nil {
+		request.Tools = p.handleTools(req.Tools)
+	}
+
+	// 处理其他可选参数
+	if req.MaxTokens > 0 {
+		request.MaxTokens = req.MaxTokens
+	}
+
+	if share.GetDebug() {
+		helper.PrintWithLabel("[DEBUG] Request Body", request)
+	}
+
+	return json.Marshal(request)
+}
+
+func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (*llm.CompletionResponse, error) {
+	jsonBody, err := p.PrepareRequest(req, false)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := p.DoPost(ctx, "", jsonBody)
+	resp, err := p.DoPost(ctx, defaultAPIEndpoint, jsonBody)
 	if err != nil {
 		return nil, err
 	}
@@ -86,51 +107,28 @@ func (p *Provider) Complete(ctx context.Context, req llm.CompletionRequest) (*ll
 
 func (p *Provider) CompleteStream(ctx context.Context, req llm.CompletionRequest, handler llm.StreamHandler) error {
 	p.StreamHandler = NewStreamHandler(handler)
-	reqBody := p.PrepareRequest(req)
-	reqBodyStruct := p.HandleRequestBody(req, reqBody).(*CompletionRequestBody)
-	reqBodyStruct.Stream = true
-
-	jsonBody, err := json.Marshal(reqBodyStruct)
+	jsonBody, err := p.PrepareRequest(req, false)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
 	}
-
-	resp, err := p.DoPost(ctx, "", jsonBody)
+	resp, err := p.DoStream(ctx, defaultAPIEndpoint, jsonBody)
 	if err != nil {
 		return err
 	}
 
-	return p.handleStream(resp.RawBody())
+	return p.HandleStreamResponse(resp, p)
 }
 
-func (p *Provider) handleStream(body io.Reader) error {
-	reader := bufio.NewReader(body)
-
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return fmt.Errorf("read response: %w", err)
-		}
-
-		line = strings.TrimSpace(line)
-		if line == "" || line == "data: [DONE]" {
-			continue
-		}
-
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-
-		data := strings.TrimPrefix(line, "data: ")
-		if err := p.StreamHandler.AddContent([]byte(data)); err != nil {
-			return fmt.Errorf("handle stream data: %w", err)
-		}
+// HandleStream 处理流式响应
+func (p *Provider) HandleStream(bytes []byte) error {
+	line := strings.TrimSpace(string(bytes))
+	helper.PrintWithLabel("[DEBUG] Stream Response", line)
+	if line == "" || line == "data: [DONE]" || !strings.HasPrefix(line, "data: ") {
+		return nil
 	}
+	data := strings.TrimPrefix(line, "data: ")
 
-	return nil
+	return p.StreamHandler.AddContent([]byte(data))
 }
 
 // 将响应结构体提取到类型定义中
@@ -170,36 +168,6 @@ func (p *Provider) ParseResponse(body io.Reader) (*llm.CompletionResponse, error
 	}
 
 	return response, nil
-}
-
-// 移除不再需要的 ParseStreamResponse 方法，使用 StreamHandler 处理
-func (p *Provider) ParseStreamResponse(data string) (content string, finishReason string, err error) {
-	var streamResp struct {
-		Type    string `json:"type"`
-		Content struct {
-			Text string `json:"text"`
-		} `json:"content"`
-		StopReason string `json:"stop_reason"`
-	}
-
-	if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
-		return "", "", fmt.Errorf("unmarshal response: %w", err)
-	}
-
-	if streamResp.Type == "content_block_delta" {
-		return streamResp.Content.Text, "", nil
-	} else if streamResp.Type == "message_delta" {
-		return "", streamResp.StopReason, nil
-	}
-
-	return "", "", nil
-}
-
-func (p *Provider) HandleRequestBody(req llm.CompletionRequest, reqBody map[string]interface{}) interface{} {
-	request, _ := helper.MapToStruct[CompletionRequestBody](reqBody)
-	request.Tools = p.handleTools(req.Tools)
-	request.Messages = p.handleMessages(req.Messages)
-	return request
 }
 
 func (p *Provider) handleTools(tools []mcp.Tool) []Tool {
@@ -269,7 +237,7 @@ func init() {
 }
 
 func (p *Provider) AvailableModels() []string {
-	resp, err := p.DoGet(context.Background(), "/models", nil)
+	resp, err := p.DoGet(context.Background(), modelsAPIEndpoint, nil)
 	if err != nil {
 		helper.PrintWithLabel("[ERROR] Failed to fetch models", err)
 		return []string{}
@@ -281,8 +249,13 @@ func (p *Provider) AvailableModels() []string {
 		} `json:"models"`
 	}
 
-	if err := json.NewDecoder(resp.RawBody()).Decode(&response); err != nil {
-		helper.PrintWithLabel("[ERROR] Failed to decode models response", err)
+	bodyBytes := resp.Body()
+	helper.PrintWithLabel("[DEBUG] Get Models Response", resp.Body())
+	if err := json.Unmarshal(bodyBytes, &response); err != nil {
+		if share.GetDebug() {
+			helper.PrintWithLabel("[DEBUG] Models Response Error", err)
+			helper.PrintWithLabel("[DEBUG] Raw Response", string(bodyBytes))
+		}
 		return []string{}
 	}
 

@@ -309,7 +309,7 @@ func (p *Provider) AvailableModels() []string {
 			helper.PrintWithLabel("[DEBUG] Models Response Error", err)
 			helper.PrintWithLabel("[DEBUG] Raw Response", string(bodyBytes))
 		}
-		return []string{"gpt-3.5-turbo", "gpt-4"}
+		return []string{}
 	}
 
 	models := make([]string, 0)
