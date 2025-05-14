@@ -68,7 +68,7 @@ func New(options map[string]interface{}) (llm.Provider, error) {
 
 func (p *Provider) PrepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
 	// 创建请求体结构
-	request := &CompletionRequestBody{
+	request := &ClaudeRequest{
 		Model:    p.Model,
 		Stream:   stream,
 		Messages: p.handleMessages(req.Messages),

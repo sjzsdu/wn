@@ -120,7 +120,7 @@ func (p *Provider) HandleStream(bytes []byte) error {
 // PrepareRequest 准备请求
 func (p *Provider) PrepareRequest(req llm.CompletionRequest, stream bool) ([]byte, error) {
 	// 创建请求体结构
-	request := &CompletionRequestBody{
+	request := &OpenAIRequest{
 		Model:     p.Model,
 		MaxTokens: 4096,
 		Stream:    stream,

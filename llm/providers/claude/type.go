@@ -1,6 +1,6 @@
 package claude
 
-type CompletionRequestBody struct {
+type ClaudeRequest struct {
 	Model     string    `json:"model"`
 	Messages  []Message `json:"messages"`
 	MaxTokens int       `json:"max_tokens"`
