@@ -66,12 +66,8 @@ type Provider interface {
 	// CompleteStream 发送流式请求到大模型并通过回调处理响应
 	CompleteStream(ctx context.Context, req CompletionRequest, handler StreamHandler) error
 
-	// Name 返回提供商名称
-	GetName() string
-
-	// AvailableModels 返回该提供商支持的模型列表
 	AvailableModels() []string
-
+	GetName() string
 	SetModel(model string) string
 	GetModel() string
 }
